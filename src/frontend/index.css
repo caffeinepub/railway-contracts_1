@@ -1,0 +1,166 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Bricolage Grotesque - Display font */
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/assets/fonts/BricolageGrotesque[opsz,wdth,wght].woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* General Sans - Body font */
+@font-face {
+  font-family: "General Sans";
+  src: url("/assets/fonts/GeneralSans-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Cabinet Grotesk - Accent font */
+@font-face {
+  font-family: "Cabinet Grotesk";
+  src: url("/assets/fonts/CabinetGrotesk-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+
+    /* Railway Industrial — Deep steel blue with amber accent */
+    --background: 0.16 0.012 250;
+    --foreground: 0.94 0.01 250;
+    --card: 0.19 0.014 250;
+    --card-foreground: 0.92 0.01 250;
+    --popover: 0.21 0.016 250;
+    --popover-foreground: 0.92 0.01 250;
+    --primary: 0.62 0.18 44;
+    --primary-foreground: 0.12 0.01 250;
+    --secondary: 0.24 0.016 250;
+    --secondary-foreground: 0.85 0.01 250;
+    --muted: 0.22 0.014 250;
+    --muted-foreground: 0.62 0.01 250;
+    --accent: 0.62 0.18 44;
+    --accent-foreground: 0.12 0.01 250;
+    --destructive: 0.62 0.22 25;
+    --destructive-foreground: 0.98 0 0;
+    --border: 0.28 0.016 250;
+    --input: 0.28 0.016 250;
+    --ring: 0.62 0.18 44;
+
+    /* Steel blue tones for charts */
+    --chart-1: 0.62 0.18 44;
+    --chart-2: 0.58 0.16 220;
+    --chart-3: 0.52 0.12 190;
+    --chart-4: 0.68 0.14 160;
+    --chart-5: 0.72 0.16 80;
+
+    --sidebar: 0.14 0.012 250;
+    --sidebar-foreground: 0.92 0.01 250;
+    --sidebar-primary: 0.62 0.18 44;
+    --sidebar-primary-foreground: 0.12 0.01 250;
+    --sidebar-accent: 0.22 0.016 250;
+    --sidebar-accent-foreground: 0.85 0.01 250;
+    --sidebar-border: 0.28 0.016 250;
+    --sidebar-ring: 0.62 0.18 44;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "General Sans", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: oklch(var(--background));
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(var(--border));
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(var(--muted-foreground));
+}
+
+/* Spreadsheet preview table styles */
+.spreadsheet-preview {
+  @apply text-sm;
+}
+.spreadsheet-preview table {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: "General Sans", monospace;
+  font-size: 0.75rem;
+}
+.spreadsheet-preview th {
+  background: oklch(var(--secondary));
+  color: oklch(var(--secondary-foreground));
+  padding: 6px 10px;
+  text-align: left;
+  font-weight: 600;
+  border: 1px solid oklch(var(--border));
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.spreadsheet-preview td {
+  padding: 5px 10px;
+  border: 1px solid oklch(var(--border) / 60%);
+  color: oklch(var(--foreground));
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spreadsheet-preview tr:nth-child(even) td {
+  background: oklch(var(--muted) / 40%);
+}
+.spreadsheet-preview tr:hover td {
+  background: oklch(var(--accent) / 10%);
+}
+.spreadsheet-preview tfoot .spreadsheet-tfoot td {
+  background: oklch(var(--primary) / 12%);
+  border-top: 2px solid oklch(var(--primary) / 35%);
+  font-weight: 700;
+  color: oklch(var(--primary));
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+}
+
+/* Grid track pattern background */
+.track-pattern {
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      oklch(var(--border) / 20%) 0px,
+      oklch(var(--border) / 20%) 1px,
+      transparent 1px,
+      transparent 60px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      oklch(var(--border) / 20%) 0px,
+      oklch(var(--border) / 20%) 1px,
+      transparent 1px,
+      transparent 60px
+    );
+}
