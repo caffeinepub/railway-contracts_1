@@ -112,7 +112,7 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const acceptedTypes = section?.isExpense ? ".xlsx" : ".xlsx,.pdf,.doc,.docx";
+  const acceptedTypes = ".xlsx,.pdf,.doc,.docx";
 
   const fetchFiles = useCallback(async () => {
     if (!actor || !section) return;
@@ -136,10 +136,10 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
     }
   }, [section, actor, fetchFiles]);
 
-  // Load spreadsheet preview for most recent xlsx on expense sections
+  // Load spreadsheet preview for most recent xlsx
   useEffect(() => {
-    if (!section?.isExpense || files.length === 0) {
-      if (!section?.isExpense) setSpreadsheetData(null);
+    if (files.length === 0) {
+      setSpreadsheetData(null);
       return;
     }
 
@@ -165,16 +165,14 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
         setSpreadsheetData(null);
       })
       .finally(() => setIsLoadingPreview(false));
-  }, [files, section?.isExpense]);
+  }, [files]);
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !actor || !section) return;
 
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-    const allowed = section.isExpense
-      ? ["xlsx"]
-      : ["xlsx", "pdf", "doc", "docx"];
+    const allowed = ["xlsx", "xls", "pdf", "doc", "docx"];
 
     if (!allowed.includes(ext)) {
       toast.error(`Invalid file type. Allowed: ${allowed.join(", ")}`);
@@ -192,8 +190,8 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
     setUploadProgress(0);
 
     try {
-      // Parse xlsx preview immediately for expense sections
-      if (section.isExpense && (ext === "xlsx" || ext === "xls")) {
+      // Parse xlsx preview immediately for all sections
+      if (ext === "xlsx" || ext === "xls") {
         setIsLoadingPreview(true);
         try {
           const preview = await parseXlsxFile(file);
@@ -334,7 +332,7 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                 disabled={isUploading}
                 className="shrink-0 h-9 w-9 hover:bg-secondary text-muted-foreground hover:text-primary transition-colors"
                 aria-label="Upload file"
-                title={section.isExpense ? "Upload Excel file" : "Upload file"}
+                title="Upload file"
               >
                 <Upload className="w-4 h-4" />
               </Button>
@@ -494,129 +492,127 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                 )}
 
                 {/* Spreadsheet Preview */}
-                {section.isExpense && (
-                  <div>
-                    <h3 className="font-display font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-                      <TableProperties className="w-4 h-4" />
-                      Spreadsheet Preview
-                    </h3>
+                <div>
+                  <h3 className="font-display font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <TableProperties className="w-4 h-4" />
+                    Spreadsheet Preview
+                  </h3>
 
-                    {isLoadingPreview ? (
-                      <div className="space-y-2">
-                        <Skeleton className="h-16 w-full rounded-xl bg-card mb-3" />
-                        <Skeleton className="h-8 w-full rounded bg-card" />
-                        {PREVIEW_SKELETON_KEYS.map((k) => (
-                          <Skeleton
-                            key={k}
-                            className="h-6 w-full rounded bg-card"
-                          />
-                        ))}
-                      </div>
-                    ) : spreadsheetData ? (
-                      <>
-                        <div className="rounded-xl border border-border overflow-hidden bg-card">
-                          <div className="bg-secondary/50 px-4 py-2.5 border-b border-border flex items-center gap-2">
-                            <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
-                            <span className="text-xs font-body font-medium text-muted-foreground">
-                              Sheet 1 — {spreadsheetData.rows.length} rows
-                            </span>
-                          </div>
-                          <div className="overflow-x-auto max-h-[400px] overflow-y-auto spreadsheet-preview">
-                            {spreadsheetData.headers.length === 0 ? (
-                              <div className="py-8 text-center text-sm text-muted-foreground font-body">
-                                Spreadsheet appears to be empty
-                              </div>
-                            ) : (
-                              (() => {
-                                const colTotals =
-                                  computeColumnTotals(spreadsheetData);
-                                return (
-                                  <table>
-                                    <thead>
-                                      <tr>
-                                        <th className="text-muted-foreground w-10 text-center">
-                                          #
-                                        </th>
-                                        {spreadsheetData.headers.map((h, i) => (
-                                          // biome-ignore lint/suspicious/noArrayIndexKey: spreadsheet columns have no stable key
-                                          <th key={i}>{h || `Col ${i + 1}`}</th>
-                                        ))}
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {spreadsheetData.rows
-                                        .slice(0, 100)
-                                        .map((row, ri) => (
-                                          // biome-ignore lint/suspicious/noArrayIndexKey: spreadsheet rows have no stable key
-                                          <tr key={ri}>
-                                            <td className="text-muted-foreground text-center text-xs w-10">
-                                              {ri + 1}
-                                            </td>
-                                            {spreadsheetData.headers.map(
-                                              (_, ci) => (
-                                                // biome-ignore lint/suspicious/noArrayIndexKey: spreadsheet cells have no stable key
-                                                <td key={ci}>
-                                                  {row[ci] != null
-                                                    ? String(row[ci])
-                                                    : ""}
-                                                </td>
-                                              ),
-                                            )}
-                                          </tr>
-                                        ))}
-                                      {spreadsheetData.rows.length > 100 && (
-                                        <tr>
-                                          <td
-                                            colSpan={
-                                              spreadsheetData.headers.length + 1
-                                            }
-                                            className="text-center text-xs text-muted-foreground py-3 font-body"
-                                          >
-                                            … and{" "}
-                                            {spreadsheetData.rows.length - 100}{" "}
-                                            more rows
-                                          </td>
-                                        </tr>
-                                      )}
-                                    </tbody>
-                                    <tfoot>
-                                      <tr className="spreadsheet-tfoot">
-                                        <td className="text-center font-bold text-xs text-muted-foreground w-10">
-                                          Σ
-                                        </td>
-                                        {colTotals.map((total, ci) => (
-                                          // biome-ignore lint/suspicious/noArrayIndexKey: spreadsheet columns have no stable key
-                                          <td key={ci} className="font-bold">
-                                            {total !== null
-                                              ? total.toLocaleString("en-IN", {
-                                                  maximumFractionDigits: 2,
-                                                })
-                                              : ""}
-                                          </td>
-                                        ))}
-                                      </tr>
-                                    </tfoot>
-                                  </table>
-                                );
-                              })()
-                            )}
-                          </div>
+                  {isLoadingPreview ? (
+                    <div className="space-y-2">
+                      <Skeleton className="h-16 w-full rounded-xl bg-card mb-3" />
+                      <Skeleton className="h-8 w-full rounded bg-card" />
+                      {PREVIEW_SKELETON_KEYS.map((k) => (
+                        <Skeleton
+                          key={k}
+                          className="h-6 w-full rounded bg-card"
+                        />
+                      ))}
+                    </div>
+                  ) : spreadsheetData ? (
+                    <>
+                      <div className="rounded-xl border border-border overflow-hidden bg-card">
+                        <div className="bg-secondary/50 px-4 py-2.5 border-b border-border flex items-center gap-2">
+                          <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span className="text-xs font-body font-medium text-muted-foreground">
+                            Sheet 1 — {spreadsheetData.rows.length} rows
+                          </span>
                         </div>
-                      </>
-                    ) : files.filter(
-                        (f) =>
-                          f.fileType.toLowerCase() === "xlsx" ||
-                          f.fileType.toLowerCase() === "xls",
-                      ).length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-border py-10 text-center">
-                        <FileSpreadsheet className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
-                        <p className="text-sm font-body text-muted-foreground">
-                          Upload an Excel file to see a live preview
-                        </p>
+                        <div className="overflow-x-auto max-h-[400px] overflow-y-auto spreadsheet-preview">
+                          {spreadsheetData.headers.length === 0 ? (
+                            <div className="py-8 text-center text-sm text-muted-foreground font-body">
+                              Spreadsheet appears to be empty
+                            </div>
+                          ) : (
+                            (() => {
+                              const colTotals =
+                                computeColumnTotals(spreadsheetData);
+                              return (
+                                <table>
+                                  <thead>
+                                    <tr>
+                                      <th className="text-muted-foreground w-10 text-center">
+                                        #
+                                      </th>
+                                      {spreadsheetData.headers.map((h, i) => (
+                                        // biome-ignore lint/suspicious/noArrayIndexKey: spreadsheet columns have no stable key
+                                        <th key={i}>{h || `Col ${i + 1}`}</th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {spreadsheetData.rows
+                                      .slice(0, 100)
+                                      .map((row, ri) => (
+                                        // biome-ignore lint/suspicious/noArrayIndexKey: spreadsheet rows have no stable key
+                                        <tr key={ri}>
+                                          <td className="text-muted-foreground text-center text-xs w-10">
+                                            {ri + 1}
+                                          </td>
+                                          {spreadsheetData.headers.map(
+                                            (_, ci) => (
+                                              // biome-ignore lint/suspicious/noArrayIndexKey: spreadsheet cells have no stable key
+                                              <td key={ci}>
+                                                {row[ci] != null
+                                                  ? String(row[ci])
+                                                  : ""}
+                                              </td>
+                                            ),
+                                          )}
+                                        </tr>
+                                      ))}
+                                    {spreadsheetData.rows.length > 100 && (
+                                      <tr>
+                                        <td
+                                          colSpan={
+                                            spreadsheetData.headers.length + 1
+                                          }
+                                          className="text-center text-xs text-muted-foreground py-3 font-body"
+                                        >
+                                          … and{" "}
+                                          {spreadsheetData.rows.length - 100}{" "}
+                                          more rows
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                  <tfoot>
+                                    <tr className="spreadsheet-tfoot">
+                                      <td className="text-center font-bold text-xs text-muted-foreground w-10">
+                                        Σ
+                                      </td>
+                                      {colTotals.map((total, ci) => (
+                                        // biome-ignore lint/suspicious/noArrayIndexKey: spreadsheet columns have no stable key
+                                        <td key={ci} className="font-bold">
+                                          {total !== null
+                                            ? total.toLocaleString("en-IN", {
+                                                maximumFractionDigits: 2,
+                                              })
+                                            : ""}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  </tfoot>
+                                </table>
+                              );
+                            })()
+                          )}
+                        </div>
                       </div>
-                    ) : null}
-                  </div>
-                )}
+                    </>
+                  ) : files.filter(
+                      (f) =>
+                        f.fileType.toLowerCase() === "xlsx" ||
+                        f.fileType.toLowerCase() === "xls",
+                    ).length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-border py-10 text-center">
+                      <FileSpreadsheet className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
+                      <p className="text-sm font-body text-muted-foreground">
+                        Upload an Excel file to see a live preview
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </ScrollArea>
           </motion.div>
