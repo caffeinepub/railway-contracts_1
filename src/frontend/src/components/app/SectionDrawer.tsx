@@ -12,13 +12,20 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertCircle,
   Download,
   Eye,
+  EyeOff,
   FileSpreadsheet,
   FileText,
   FileType,
+  Loader2,
+  PencilLine,
+  Plus,
+  RotateCcw,
+  Save,
   TableProperties,
   Trash2,
   Upload,
@@ -32,11 +39,10 @@ import type { FileRef } from "../../backend";
 import { useActor } from "../../hooks/useActor";
 import {
   type SpreadsheetData,
-  computeColumnTotals,
-  findPrimaryAmountColumnIndex,
+  parseXlsxBuffer,
   parseXlsxFile,
   parseXlsxFromUrl,
-} from "../../utils/xlsxLoader";
+} from "../../utils/xlsxParser";
 
 const FILE_SKELETON_KEYS = ["fsk1", "fsk2", "fsk3"];
 const PREVIEW_SKELETON_KEYS = ["psk1", "psk2", "psk3", "psk4", "psk5", "psk6"];
@@ -94,7 +100,152 @@ function getFileTypeBadgeClass(fileType: string): string {
   return "bg-muted text-muted-foreground border-border";
 }
 
-export { computeColumnTotals, findPrimaryAmountColumnIndex };
+// ─── Manual Entry Table ───────────────────────────────────────────────────────
+
+const DEFAULT_HEADERS = [
+  "Description",
+  "Quantity",
+  "Unit Price",
+  "Amount",
+  "Notes",
+];
+const DEFAULT_ROW_COUNT = 10;
+
+function createEmptyRow(colCount: number): string[] {
+  return Array.from({ length: colCount }, () => "");
+}
+
+function ManualEntryTable() {
+  const [headers, setHeaders] = useState<string[]>([...DEFAULT_HEADERS]);
+  const [rows, setRows] = useState<string[][]>(() =>
+    Array.from({ length: DEFAULT_ROW_COUNT }, () =>
+      createEmptyRow(DEFAULT_HEADERS.length),
+    ),
+  );
+
+  function updateHeader(colIdx: number, value: string) {
+    setHeaders((prev) => {
+      const next = [...prev];
+      next[colIdx] = value;
+      return next;
+    });
+  }
+
+  function updateCell(rowIdx: number, colIdx: number, value: string) {
+    setRows((prev) => {
+      const next = prev.map((r) => [...r]);
+      next[rowIdx][colIdx] = value;
+      return next;
+    });
+  }
+
+  function addRow() {
+    setRows((prev) => [...prev, createEmptyRow(headers.length)]);
+  }
+
+  function clearAll() {
+    setHeaders([...DEFAULT_HEADERS]);
+    setRows(
+      Array.from({ length: DEFAULT_ROW_COUNT }, () =>
+        createEmptyRow(DEFAULT_HEADERS.length),
+      ),
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-border overflow-hidden bg-card">
+      {/* Section header bar */}
+      <div className="bg-secondary/50 px-4 py-2.5 border-b border-border flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <PencilLine className="w-4 h-4 text-primary shrink-0" />
+          <span className="text-xs font-body font-semibold text-foreground">
+            Manual Entry
+          </span>
+          <span className="text-xs text-muted-foreground font-body">
+            — editable scratch pad
+          </span>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={clearAll}
+          className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 gap-1.5"
+          data-ocid="manual-entry.delete_button"
+        >
+          <RotateCcw className="w-3 h-3" />
+          Clear All
+        </Button>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto max-h-[360px] overflow-y-auto spreadsheet-preview">
+        <table className="manual-entry-table">
+          <thead>
+            <tr>
+              <th className="text-muted-foreground w-10 text-center text-xs">
+                #
+              </th>
+              {headers.map((h, ci) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: header columns have no stable key
+                <th key={ci} className="min-w-[130px]">
+                  <input
+                    type="text"
+                    value={h}
+                    onChange={(e) => updateHeader(ci, e.target.value)}
+                    className="w-full bg-transparent border-none outline-none text-xs font-semibold text-secondary-foreground placeholder:text-muted-foreground/60 focus:text-foreground transition-colors"
+                    placeholder={`Col ${ci + 1}`}
+                    aria-label={`Column ${ci + 1} header`}
+                  />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: rows have no stable key
+              <tr key={ri}>
+                <td className="text-muted-foreground text-center text-xs w-10 select-none">
+                  {ri + 1}
+                </td>
+                {headers.map((_, ci) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: cells have no stable key
+                  <td key={ci} className="p-0">
+                    <input
+                      type="text"
+                      value={row[ci] ?? ""}
+                      onChange={(e) => updateCell(ri, ci, e.target.value)}
+                      className="w-full h-full bg-transparent border-none outline-none text-xs text-foreground placeholder:text-muted-foreground/30 px-[10px] py-[5px] focus:bg-primary/5 transition-colors"
+                      placeholder="—"
+                      aria-label={`Row ${ri + 1}, ${headers[ci] || `Col ${ci + 1}`}`}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Add Row footer */}
+      <div className="border-t border-border px-3 py-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={addRow}
+          className="h-7 px-2 text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 gap-1.5"
+          data-ocid="manual-entry.primary_button"
+        >
+          <Plus className="w-3 h-3" />
+          Add Row
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function SectionDrawer({ contractId, section, onClose }: Props) {
   const { actor } = useActor();
@@ -108,10 +259,18 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
   const [spreadsheetData, setSpreadsheetData] =
     useState<SpreadsheetData | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
-  const [previewFile, setPreviewFile] = useState<FileRef | null>(null);
+
+  // Notes
+  const [notes, setNotes] = useState("");
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const notesAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // PDF preview
+  const [pdfPreviewFileId, setPdfPreviewFileId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // All sections now accept all file types for upload
   const acceptedTypes = ".xlsx,.pdf,.doc,.docx";
 
   const fetchFiles = useCallback(async () => {
@@ -119,7 +278,11 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
     try {
       setIsLoadingFiles(true);
       const result = await actor.getSectionFiles(contractId, section.type);
-      setFiles(result.sort((a, b) => Number(b.uploadedAt - a.uploadedAt)));
+      const { files: fetchedFiles, notes: fetchedNotes } = result;
+      setFiles(
+        fetchedFiles.sort((a, b) => Number(b.uploadedAt - a.uploadedAt)),
+      );
+      setNotes(fetchedNotes ?? "");
     } catch (err) {
       toast.error("Failed to load files");
       console.error(err);
@@ -132,13 +295,13 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
     if (section && actor) {
       fetchFiles();
       setSpreadsheetData(null);
-      setPreviewFile(null);
+      setPdfPreviewFileId(null);
     }
   }, [section, actor, fetchFiles]);
 
-  // Load spreadsheet preview for most recent xlsx
+  // Load spreadsheet preview for most recent xlsx (all sections)
   useEffect(() => {
-    if (files.length === 0) {
+    if (!section || files.length === 0) {
       setSpreadsheetData(null);
       return;
     }
@@ -165,14 +328,14 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
         setSpreadsheetData(null);
       })
       .finally(() => setIsLoadingPreview(false));
-  }, [files]);
+  }, [files, section]);
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !actor || !section) return;
 
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-    const allowed = ["xlsx", "xls", "pdf", "doc", "docx"];
+    const allowed = ["xlsx", "pdf", "doc", "docx"];
 
     if (!allowed.includes(ext)) {
       toast.error(`Invalid file type. Allowed: ${allowed.join(", ")}`);
@@ -190,7 +353,7 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
     setUploadProgress(0);
 
     try {
-      // Parse xlsx preview immediately for all sections
+      // Parse xlsx preview immediately
       if (ext === "xlsx" || ext === "xls") {
         setIsLoadingPreview(true);
         try {
@@ -244,6 +407,9 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
       );
       toast.success(`"${deleteTarget.filename}" removed`);
       setFiles((prev) => prev.filter((f) => f.fileId !== deleteTarget.fileId));
+      if (pdfPreviewFileId === deleteTarget.fileId) {
+        setPdfPreviewFileId(null);
+      }
       setDeleteTarget(null);
     } catch (err) {
       toast.error("Failed to delete file");
@@ -269,6 +435,34 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
 
   function triggerFileInput() {
     fileInputRef.current?.click();
+  }
+
+  async function saveNotes() {
+    if (!actor || !section) return;
+    setIsSavingNotes(true);
+    try {
+      await actor.updateSectionNotes(contractId, section.type, notes);
+      toast.success("Notes saved");
+    } catch (err) {
+      toast.error("Failed to save notes");
+      console.error(err);
+    } finally {
+      setIsSavingNotes(false);
+    }
+  }
+
+  function handleNotesBlur() {
+    // Auto-save on blur with debounce
+    if (notesAutoSaveTimer.current) {
+      clearTimeout(notesAutoSaveTimer.current);
+    }
+    notesAutoSaveTimer.current = setTimeout(() => {
+      saveNotes();
+    }, 800);
+  }
+
+  function togglePdfPreview(fileId: string) {
+    setPdfPreviewFileId((prev) => (prev === fileId ? null : fileId));
   }
 
   const isOpen = !!section;
@@ -300,6 +494,7 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 320, damping: 35 }}
             className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-2xl bg-popover border-l border-border flex flex-col shadow-2xl"
+            data-ocid="section.sheet"
           >
             {/* Drawer Header */}
             <div className="flex items-center gap-3 px-6 py-5 border-b border-border shrink-0">
@@ -316,6 +511,8 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                   {section.description}
                 </p>
               </div>
+
+              {/* Upload button (small, in header) */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -330,12 +527,14 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                 size="icon"
                 onClick={triggerFileInput}
                 disabled={isUploading}
-                className="shrink-0 h-9 w-9 hover:bg-secondary text-muted-foreground hover:text-primary transition-colors"
+                className="shrink-0 h-9 w-9 hover:bg-primary/15 hover:text-primary"
                 aria-label="Upload file"
                 title="Upload file"
+                data-ocid="section.upload_button"
               >
                 <Upload className="w-4 h-4" />
               </Button>
+
               <Button
                 type="button"
                 variant="ghost"
@@ -343,19 +542,20 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                 onClick={onClose}
                 className="shrink-0 h-9 w-9 hover:bg-secondary"
                 aria-label="Close panel"
+                data-ocid="section.close_button"
               >
                 <X className="w-4 h-4" />
               </Button>
             </div>
 
-            {/* Upload Progress Bar */}
+            {/* Upload Progress Bar (shown when uploading) */}
             {isUploading && (
-              <div className="px-6 py-2 border-b border-border shrink-0 bg-secondary/30">
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="text-muted-foreground font-body">
+              <div className="px-6 py-3 border-b border-border shrink-0 bg-secondary/30">
+                <div className="flex items-center justify-between text-sm mb-1.5">
+                  <span className="text-muted-foreground font-body text-xs">
                     Uploading…
                   </span>
-                  <span className="text-primary font-body font-semibold">
+                  <span className="text-primary font-body font-semibold text-xs">
                     {uploadProgress}%
                   </span>
                 </div>
@@ -366,132 +566,195 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
             {/* Scrollable Content */}
             <ScrollArea className="flex-1">
               <div className="px-6 py-4 space-y-5">
-                {/* File List */}
+                {/* ── Notes Section ───────────────────────────────────── */}
+                <div>
+                  <h3 className="font-display font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <PencilLine className="w-4 h-4" />
+                    Notes
+                  </h3>
+                  <div className="space-y-2">
+                    <Textarea
+                      placeholder="Add notes for this section…"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      onBlur={handleNotesBlur}
+                      className="bg-card border-border text-foreground placeholder:text-muted-foreground font-body text-sm min-h-[80px] resize-none focus:ring-1 focus:ring-primary/40"
+                      data-ocid="section.notes.textarea"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={saveNotes}
+                      disabled={isSavingNotes}
+                      className="h-8 px-3 text-xs font-body border-border hover:border-primary/40 hover:bg-primary/10 hover:text-primary gap-1.5"
+                      data-ocid="section.notes.save_button"
+                    >
+                      {isSavingNotes ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Saving…
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-3 h-3" />
+                          Save Notes
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* ── File List ───────────────────────────────────────── */}
                 <div>
                   <h3 className="font-display font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-3">
                     Uploaded Files
                   </h3>
 
                   {isLoadingFiles ? (
-                    <div className="space-y-3">
+                    <div
+                      className="space-y-3"
+                      data-ocid="section.loading_state"
+                    >
                       {FILE_SKELETON_KEYS.map((k) => (
                         <Skeleton key={k} className="h-16 rounded-lg bg-card" />
                       ))}
                     </div>
                   ) : files.length === 0 ? (
-                    <div className="flex flex-col items-center py-10 text-center text-muted-foreground">
+                    <div
+                      className="flex flex-col items-center py-10 text-center text-muted-foreground"
+                      data-ocid="section.empty_state"
+                    >
                       <AlertCircle className="w-8 h-8 mb-2 opacity-40" />
                       <p className="text-sm font-body">No files uploaded yet</p>
                       <p className="text-xs font-body mt-1 opacity-70">
-                        Use the upload button in the top-right corner
+                        Click the upload icon in the header to add files
                       </p>
                     </div>
                   ) : (
                     <div className="space-y-2">
                       <AnimatePresence>
-                        {files.map((fileRef) => (
-                          <motion.div
-                            key={fileRef.fileId}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
-                            transition={{ duration: 0.2 }}
-                            className="flex items-center gap-3 bg-card border border-border rounded-lg px-4 py-3 group hover:border-border/80 transition-colors"
-                          >
-                            <div className="shrink-0">
-                              {getFileIcon(fileRef.fileType)}
-                            </div>
+                        {files.map((fileRef, fileIdx) => {
+                          const isPdf =
+                            fileRef.fileType.toLowerCase() === "pdf";
+                          const isPdfPreviewOpen =
+                            pdfPreviewFileId === fileRef.fileId;
 
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-body font-medium text-foreground truncate">
-                                {fileRef.filename}
-                              </p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span
-                                  className={`text-[10px] font-cabinet font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${getFileTypeBadgeClass(fileRef.fileType)}`}
-                                >
-                                  {fileRef.fileType.toUpperCase()}
-                                </span>
-                                <span className="text-xs text-muted-foreground font-body">
-                                  {formatDate(fileRef.uploadedAt)}
-                                </span>
+                          return (
+                            <motion.div
+                              key={fileRef.fileId}
+                              initial={{ opacity: 0, y: 8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, x: 20 }}
+                              transition={{ duration: 0.2 }}
+                              data-ocid={`section.files.item.${fileIdx + 1}`}
+                            >
+                              <div className="rounded-lg border border-border overflow-hidden">
+                                <div className="flex items-center gap-3 bg-card px-4 py-3 group hover:border-border/80 transition-colors">
+                                  <div className="shrink-0">
+                                    {getFileIcon(fileRef.fileType)}
+                                  </div>
+
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-body font-medium text-foreground truncate">
+                                      {fileRef.filename}
+                                    </p>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      <span
+                                        className={`text-[10px] font-cabinet font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${getFileTypeBadgeClass(fileRef.fileType)}`}
+                                      >
+                                        {fileRef.fileType.toUpperCase()}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground font-body">
+                                        {formatDate(fileRef.uploadedAt)}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {/* PDF eye toggle */}
+                                    {isPdf && (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className={`h-8 w-8 transition-opacity ${isPdfPreviewOpen ? "opacity-100 text-primary" : "opacity-60 hover:opacity-100"} hover:bg-secondary`}
+                                        onClick={() =>
+                                          togglePdfPreview(fileRef.fileId)
+                                        }
+                                        aria-label={
+                                          isPdfPreviewOpen
+                                            ? "Hide PDF preview"
+                                            : "Preview PDF"
+                                        }
+                                        data-ocid={`section.files.toggle.${fileIdx + 1}`}
+                                      >
+                                        {isPdfPreviewOpen ? (
+                                          <EyeOff className="w-4 h-4" />
+                                        ) : (
+                                          <Eye className="w-4 h-4" />
+                                        )}
+                                      </Button>
+                                    )}
+
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 hover:bg-secondary opacity-60 hover:opacity-100"
+                                      onClick={() => handleDownload(fileRef)}
+                                      aria-label={`Download ${fileRef.filename}`}
+                                      data-ocid={`section.files.button.${fileIdx + 1}`}
+                                    >
+                                      <Download className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 hover:bg-destructive/15 text-muted-foreground hover:text-destructive opacity-60 hover:opacity-100"
+                                      onClick={() => setDeleteTarget(fileRef)}
+                                      aria-label={`Delete ${fileRef.filename}`}
+                                      data-ocid={`section.files.delete_button.${fileIdx + 1}`}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                {/* PDF Inline Preview */}
+                                <AnimatePresence>
+                                  {isPdf && isPdfPreviewOpen && (
+                                    <motion.div
+                                      initial={{ height: 0, opacity: 0 }}
+                                      animate={{ height: "500px", opacity: 1 }}
+                                      exit={{ height: 0, opacity: 0 }}
+                                      transition={{
+                                        duration: 0.3,
+                                        ease: "easeInOut",
+                                      }}
+                                      className="overflow-hidden border-t border-border"
+                                      data-ocid={`section.pdf.panel.${fileIdx + 1}`}
+                                    >
+                                      <embed
+                                        src={fileRef.blob.getDirectURL()}
+                                        type="application/pdf"
+                                        className="w-full h-full bg-secondary/20"
+                                        title={fileRef.filename}
+                                      />
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
                               </div>
-                            </div>
-
-                            <div className="flex items-center gap-1 shrink-0">
-                              {fileRef.fileType.toLowerCase() === "pdf" && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 hover:bg-secondary opacity-60 hover:opacity-100 text-muted-foreground hover:text-primary"
-                                  onClick={() => setPreviewFile(fileRef)}
-                                  aria-label={`Preview ${fileRef.filename}`}
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </Button>
-                              )}
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 hover:bg-secondary opacity-60 hover:opacity-100"
-                                onClick={() => handleDownload(fileRef)}
-                                aria-label={`Download ${fileRef.filename}`}
-                              >
-                                <Download className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 hover:bg-destructive/15 text-muted-foreground hover:text-destructive opacity-60 hover:opacity-100"
-                                onClick={() => setDeleteTarget(fileRef)}
-                                aria-label={`Delete ${fileRef.filename}`}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </motion.div>
-                        ))}
+                            </motion.div>
+                          );
+                        })}
                       </AnimatePresence>
                     </div>
                   )}
                 </div>
 
-                {/* PDF Preview */}
-                {previewFile && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-display font-semibold text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                        <FileType className="w-4 h-4 text-red-400" />
-                        PDF Preview — {previewFile.filename}
-                      </h3>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7 hover:bg-secondary"
-                        onClick={() => setPreviewFile(null)}
-                        aria-label="Close PDF preview"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                    <div
-                      className="rounded-xl border border-border overflow-hidden bg-card"
-                      style={{ height: "500px" }}
-                    >
-                      <iframe
-                        src={previewFile.blob.getDirectURL()}
-                        className="w-full h-full"
-                        title={previewFile.filename}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Spreadsheet Preview */}
+                {/* ── Spreadsheet Preview (all sections with xlsx) ───── */}
                 <div>
                   <h3 className="font-display font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
                     <TableProperties className="w-4 h-4" />
@@ -499,8 +762,10 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                   </h3>
 
                   {isLoadingPreview ? (
-                    <div className="space-y-2">
-                      <Skeleton className="h-16 w-full rounded-xl bg-card mb-3" />
+                    <div
+                      className="space-y-2"
+                      data-ocid="section.spreadsheet.loading_state"
+                    >
                       <Skeleton className="h-8 w-full rounded bg-card" />
                       {PREVIEW_SKELETON_KEYS.map((k) => (
                         <Skeleton
@@ -510,109 +775,84 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                       ))}
                     </div>
                   ) : spreadsheetData ? (
-                    <>
-                      <div className="rounded-xl border border-border overflow-hidden bg-card">
-                        <div className="bg-secondary/50 px-4 py-2.5 border-b border-border flex items-center gap-2">
-                          <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
-                          <span className="text-xs font-body font-medium text-muted-foreground">
-                            Sheet 1 — {spreadsheetData.rows.length} rows
-                          </span>
-                        </div>
-                        <div className="overflow-x-auto max-h-[400px] overflow-y-auto spreadsheet-preview">
-                          {spreadsheetData.headers.length === 0 ? (
-                            <div className="py-8 text-center text-sm text-muted-foreground font-body">
-                              Spreadsheet appears to be empty
-                            </div>
-                          ) : (
-                            (() => {
-                              const colTotals =
-                                computeColumnTotals(spreadsheetData);
-                              return (
-                                <table>
-                                  <thead>
-                                    <tr>
-                                      <th className="text-muted-foreground w-10 text-center">
-                                        #
-                                      </th>
-                                      {spreadsheetData.headers.map((h, i) => (
-                                        // biome-ignore lint/suspicious/noArrayIndexKey: spreadsheet columns have no stable key
-                                        <th key={i}>{h || `Col ${i + 1}`}</th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {spreadsheetData.rows
-                                      .slice(0, 100)
-                                      .map((row, ri) => (
-                                        // biome-ignore lint/suspicious/noArrayIndexKey: spreadsheet rows have no stable key
-                                        <tr key={ri}>
-                                          <td className="text-muted-foreground text-center text-xs w-10">
-                                            {ri + 1}
-                                          </td>
-                                          {spreadsheetData.headers.map(
-                                            (_, ci) => (
-                                              // biome-ignore lint/suspicious/noArrayIndexKey: spreadsheet cells have no stable key
-                                              <td key={ci}>
-                                                {row[ci] != null
-                                                  ? String(row[ci])
-                                                  : ""}
-                                              </td>
-                                            ),
-                                          )}
-                                        </tr>
-                                      ))}
-                                    {spreadsheetData.rows.length > 100 && (
-                                      <tr>
-                                        <td
-                                          colSpan={
-                                            spreadsheetData.headers.length + 1
-                                          }
-                                          className="text-center text-xs text-muted-foreground py-3 font-body"
-                                        >
-                                          … and{" "}
-                                          {spreadsheetData.rows.length - 100}{" "}
-                                          more rows
-                                        </td>
-                                      </tr>
-                                    )}
-                                  </tbody>
-                                  <tfoot>
-                                    <tr className="spreadsheet-tfoot">
-                                      <td className="text-center font-bold text-xs text-muted-foreground w-10">
-                                        Σ
-                                      </td>
-                                      {colTotals.map((total, ci) => (
-                                        // biome-ignore lint/suspicious/noArrayIndexKey: spreadsheet columns have no stable key
-                                        <td key={ci} className="font-bold">
-                                          {total !== null
-                                            ? total.toLocaleString("en-IN", {
-                                                maximumFractionDigits: 2,
-                                              })
-                                            : ""}
-                                        </td>
-                                      ))}
-                                    </tr>
-                                  </tfoot>
-                                </table>
-                              );
-                            })()
-                          )}
-                        </div>
+                    <div className="rounded-xl border border-border overflow-hidden bg-card">
+                      <div className="bg-secondary/50 px-4 py-2.5 border-b border-border flex items-center gap-2">
+                        <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span className="text-xs font-body font-medium text-muted-foreground">
+                          Sheet 1 — {spreadsheetData.rows.length} rows
+                        </span>
                       </div>
-                    </>
-                  ) : files.filter(
-                      (f) =>
-                        f.fileType.toLowerCase() === "xlsx" ||
-                        f.fileType.toLowerCase() === "xls",
-                    ).length === 0 ? (
+                      <div className="overflow-x-auto max-h-[400px] overflow-y-auto spreadsheet-preview">
+                        {spreadsheetData.headers.length === 0 ? (
+                          <div className="py-8 text-center text-sm text-muted-foreground font-body">
+                            Spreadsheet appears to be empty
+                          </div>
+                        ) : (
+                          <table>
+                            <thead>
+                              <tr>
+                                <th className="text-muted-foreground w-10 text-center">
+                                  #
+                                </th>
+                                {spreadsheetData.headers.map((h, i) => (
+                                  // biome-ignore lint/suspicious/noArrayIndexKey: spreadsheet columns have no stable key
+                                  <th key={i}>{h || `Col ${i + 1}`}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {spreadsheetData.rows
+                                .slice(0, 100)
+                                .map((row, ri) => (
+                                  // biome-ignore lint/suspicious/noArrayIndexKey: spreadsheet rows have no stable key
+                                  <tr key={ri}>
+                                    <td className="text-muted-foreground text-center text-xs w-10">
+                                      {ri + 1}
+                                    </td>
+                                    {spreadsheetData.headers.map((_, ci) => (
+                                      // biome-ignore lint/suspicious/noArrayIndexKey: spreadsheet cells have no stable key
+                                      <td key={ci}>
+                                        {row[ci] != null ? String(row[ci]) : ""}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              {spreadsheetData.rows.length > 100 && (
+                                <tr>
+                                  <td
+                                    colSpan={spreadsheetData.headers.length + 1}
+                                    className="text-center text-xs text-muted-foreground py-3 font-body"
+                                  >
+                                    … and {spreadsheetData.rows.length - 100}{" "}
+                                    more rows
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
                     <div className="rounded-xl border border-dashed border-border py-10 text-center">
                       <FileSpreadsheet className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
                       <p className="text-sm font-body text-muted-foreground">
                         Upload an Excel file to see a live preview
                       </p>
                     </div>
-                  ) : null}
+                  )}
                 </div>
+
+                {/* ── Manual Entry Table (expense sections only) ──────── */}
+                {section.isExpense && (
+                  <div>
+                    <h3 className="font-display font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                      <PencilLine className="w-4 h-4" />
+                      Quick Entry Table
+                    </h3>
+                    <ManualEntryTable />
+                  </div>
+                )}
               </div>
             </ScrollArea>
           </motion.div>
@@ -624,7 +864,10 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
         open={!!deleteTarget}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
       >
-        <AlertDialogContent className="bg-popover border-border z-[60]">
+        <AlertDialogContent
+          className="bg-popover border-border z-[60]"
+          data-ocid="section.delete.dialog"
+        >
           <AlertDialogHeader>
             <AlertDialogTitle className="font-display font-bold text-foreground">
               Remove File
@@ -638,11 +881,17 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="font-body">Cancel</AlertDialogCancel>
+            <AlertDialogCancel
+              className="font-body"
+              data-ocid="section.delete.cancel_button"
+            >
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90 font-body"
+              data-ocid="section.delete.confirm_button"
             >
               {isDeleting ? "Removing…" : "Remove File"}
             </AlertDialogAction>

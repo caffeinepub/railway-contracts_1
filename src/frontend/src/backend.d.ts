@@ -16,8 +16,10 @@ export class ExternalBlob {
 }
 export interface ContractResponse {
     id: bigint;
+    status: string;
     name: string;
     createdAt: bigint;
+    contractValue?: bigint;
 }
 export interface FileRef {
     blob: ExternalBlob;
@@ -35,10 +37,16 @@ export enum SectionType {
 }
 export interface backendInterface {
     addFileToSection(contractId: bigint, section: SectionType, fileId: string, blob: ExternalBlob, filename: string, fileType: string): Promise<void>;
-    createContract(name: string): Promise<bigint>;
+    createContract(name: string, status: string, contractValue: bigint | null): Promise<bigint>;
     deleteContract(id: bigint): Promise<void>;
     getAllContracts(): Promise<Array<ContractResponse>>;
     getContract(id: bigint): Promise<ContractResponse>;
-    getSectionFiles(contractId: bigint, section: SectionType): Promise<Array<FileRef>>;
+    getContractFileCounts(id: bigint): Promise<Array<[string, bigint]>>;
+    getSectionFiles(contractId: bigint, section: SectionType): Promise<{
+        files: Array<FileRef>;
+        notes: string;
+    }>;
     removeFileFromSection(contractId: bigint, section: SectionType, fileId: string): Promise<void>;
+    updateContract(id: bigint, name: string, status: string, contractValue: bigint | null): Promise<void>;
+    updateSectionNotes(contractId: bigint, section: SectionType, notes: string): Promise<void>;
 }

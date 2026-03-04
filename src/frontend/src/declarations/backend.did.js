@@ -29,8 +29,10 @@ export const SectionType = IDL.Variant({
 export const ExternalBlob = IDL.Vec(IDL.Nat8);
 export const ContractResponse = IDL.Record({
   'id' : IDL.Nat,
+  'status' : IDL.Text,
   'name' : IDL.Text,
   'createdAt' : IDL.Int,
+  'contractValue' : IDL.Opt(IDL.Nat),
 });
 export const FileRef = IDL.Record({
   'blob' : ExternalBlob,
@@ -72,16 +74,31 @@ export const idlService = IDL.Service({
       [],
       [],
     ),
-  'createContract' : IDL.Func([IDL.Text], [IDL.Nat], []),
+  'createContract' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Opt(IDL.Nat)],
+      [IDL.Nat],
+      [],
+    ),
   'deleteContract' : IDL.Func([IDL.Nat], [], []),
   'getAllContracts' : IDL.Func([], [IDL.Vec(ContractResponse)], ['query']),
   'getContract' : IDL.Func([IDL.Nat], [ContractResponse], ['query']),
+  'getContractFileCounts' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
+      ['query'],
+    ),
   'getSectionFiles' : IDL.Func(
       [IDL.Nat, SectionType],
-      [IDL.Vec(FileRef)],
+      [IDL.Record({ 'files' : IDL.Vec(FileRef), 'notes' : IDL.Text })],
       ['query'],
     ),
   'removeFileFromSection' : IDL.Func([IDL.Nat, SectionType, IDL.Text], [], []),
+  'updateContract' : IDL.Func(
+      [IDL.Nat, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat)],
+      [],
+      [],
+    ),
+  'updateSectionNotes' : IDL.Func([IDL.Nat, SectionType, IDL.Text], [], []),
 });
 
 export const idlInitArgs = [];
@@ -108,8 +125,10 @@ export const idlFactory = ({ IDL }) => {
   const ExternalBlob = IDL.Vec(IDL.Nat8);
   const ContractResponse = IDL.Record({
     'id' : IDL.Nat,
+    'status' : IDL.Text,
     'name' : IDL.Text,
     'createdAt' : IDL.Int,
+    'contractValue' : IDL.Opt(IDL.Nat),
   });
   const FileRef = IDL.Record({
     'blob' : ExternalBlob,
@@ -151,13 +170,22 @@ export const idlFactory = ({ IDL }) => {
         [],
         [],
       ),
-    'createContract' : IDL.Func([IDL.Text], [IDL.Nat], []),
+    'createContract' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Opt(IDL.Nat)],
+        [IDL.Nat],
+        [],
+      ),
     'deleteContract' : IDL.Func([IDL.Nat], [], []),
     'getAllContracts' : IDL.Func([], [IDL.Vec(ContractResponse)], ['query']),
     'getContract' : IDL.Func([IDL.Nat], [ContractResponse], ['query']),
+    'getContractFileCounts' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
+        ['query'],
+      ),
     'getSectionFiles' : IDL.Func(
         [IDL.Nat, SectionType],
-        [IDL.Vec(FileRef)],
+        [IDL.Record({ 'files' : IDL.Vec(FileRef), 'notes' : IDL.Text })],
         ['query'],
       ),
     'removeFileFromSection' : IDL.Func(
@@ -165,6 +193,12 @@ export const idlFactory = ({ IDL }) => {
         [],
         [],
       ),
+    'updateContract' : IDL.Func(
+        [IDL.Nat, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat)],
+        [],
+        [],
+      ),
+    'updateSectionNotes' : IDL.Func([IDL.Nat, SectionType, IDL.Text], [], []),
   });
 };
 

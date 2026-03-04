@@ -12,8 +12,10 @@ import type { Principal } from '@icp-sdk/core/principal';
 
 export interface ContractResponse {
   'id' : bigint,
+  'status' : string,
   'name' : string,
   'createdAt' : bigint,
+  'contractValue' : [] | [bigint],
 }
 export type ExternalBlob = Uint8Array;
 export interface FileRef {
@@ -59,15 +61,24 @@ export interface _SERVICE {
     [bigint, SectionType, string, ExternalBlob, string, string],
     undefined
   >,
-  'createContract' : ActorMethod<[string], bigint>,
+  'createContract' : ActorMethod<[string, string, [] | [bigint]], bigint>,
   'deleteContract' : ActorMethod<[bigint], undefined>,
   'getAllContracts' : ActorMethod<[], Array<ContractResponse>>,
   'getContract' : ActorMethod<[bigint], ContractResponse>,
-  'getSectionFiles' : ActorMethod<[bigint, SectionType], Array<FileRef>>,
+  'getContractFileCounts' : ActorMethod<[bigint], Array<[string, bigint]>>,
+  'getSectionFiles' : ActorMethod<
+    [bigint, SectionType],
+    { 'files' : Array<FileRef>, 'notes' : string }
+  >,
   'removeFileFromSection' : ActorMethod<
     [bigint, SectionType, string],
     undefined
   >,
+  'updateContract' : ActorMethod<
+    [bigint, string, string, [] | [bigint]],
+    undefined
+  >,
+  'updateSectionNotes' : ActorMethod<[bigint, SectionType, string], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

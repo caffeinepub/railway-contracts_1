@@ -136,14 +136,43 @@
 .spreadsheet-preview tr:hover td {
   background: oklch(var(--accent) / 10%);
 }
-.spreadsheet-preview tfoot .spreadsheet-tfoot td {
-  background: oklch(var(--primary) / 12%);
-  border-top: 2px solid oklch(var(--primary) / 35%);
-  font-weight: 700;
-  color: oklch(var(--primary));
+
+/* Manual entry table — editable scratch pad */
+.manual-entry-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: "General Sans", monospace;
+  font-size: 0.75rem;
+}
+.manual-entry-table th {
+  background: oklch(var(--secondary));
+  color: oklch(var(--secondary-foreground));
+  padding: 0 10px;
+  text-align: left;
+  font-weight: 600;
+  border: 1px solid oklch(var(--border));
+  white-space: nowrap;
   position: sticky;
-  bottom: 0;
+  top: 0;
   z-index: 1;
+  height: 32px;
+}
+.manual-entry-table td {
+  border: 1px solid oklch(var(--border) / 60%);
+  color: oklch(var(--foreground));
+  white-space: nowrap;
+  padding: 0;
+  min-width: 130px;
+  max-width: 200px;
+}
+.manual-entry-table tr:nth-child(even) td {
+  background: oklch(var(--muted) / 40%);
+}
+.manual-entry-table tr:hover td {
+  background: oklch(var(--accent) / 8%);
+}
+.manual-entry-table td input:focus {
+  background: oklch(var(--primary) / 8%) !important;
 }
 
 /* Grid track pattern background */

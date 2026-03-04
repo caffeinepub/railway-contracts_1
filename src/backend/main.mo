@@ -1,25 +1,18 @@
+import Array "mo:core/Array";
+import Nat "mo:core/Nat";
 import Int "mo:core/Int";
-import Order "mo:core/Order";
 import Time "mo:core/Time";
-import Text "mo:core/Text";
+import Order "mo:core/Order";
 import Runtime "mo:core/Runtime";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
-import Migration "migration";
 
-(with migration = Migration.run)
+
+
 actor {
   include MixinStorage();
 
-  public type FileRef = {
-    fileId : Text;
-    blob : Storage.ExternalBlob;
-    filename : Text;
-    fileType : Text;
-    uploadedAt : Int;
-  };
-
-  public type SectionType = {
+  type SectionType = {
     #TenderDetails;
     #LOI;
     #RunningBill;
@@ -27,106 +20,146 @@ actor {
     #MaterialExpenses;
   };
 
-  public type SectionEntry = {
-    section : SectionType;
-    files : [FileRef];
+  type FileRef = {
+    fileId : Text;
+    blob : Storage.ExternalBlob;
+    filename : Text;
+    fileType : Text;
+    uploadedAt : Int;
   };
 
-  public type Contract = {
+  type SectionEntry = {
+    sectionType : SectionType;
+    files : [FileRef];
+    notes : Text;
+  };
+
+  type Contract = {
     id : Nat;
     name : Text;
+    status : Text; // "Active" | "Completed" | "On Hold"
+    contractValue : ?Nat;
     createdAt : Int;
     sections : [SectionEntry];
   };
 
-  public type ContractResponse = {
+  type ContractResponse = {
     id : Nat;
     name : Text;
+    status : Text;
+    contractValue : ?Nat;
     createdAt : Int;
   };
 
   var nextContractId = 0;
-  var contractsArray : [Contract] = [];
+  var contracts : [Contract] = [];
 
-  func sectionEq(a : SectionType, b : SectionType) : Bool {
-    switch (a, b) {
-      case (#TenderDetails, #TenderDetails) { true };
-      case (#LOI, #LOI) { true };
-      case (#RunningBill, #RunningBill) { true };
-      case (#SiteExpenses, #SiteExpenses) { true };
-      case (#MaterialExpenses, #MaterialExpenses) { true };
-      case _ { false };
+  func createEmptySection(sectionType : SectionType) : SectionEntry {
+    {
+      sectionType;
+      files = [];
+      notes = "";
     };
   };
 
-  func defaultSections() : [SectionEntry] {
+  func createAllSections() : [SectionEntry] {
     [
-      { section = #TenderDetails; files = [] },
-      { section = #LOI; files = [] },
-      { section = #RunningBill; files = [] },
-      { section = #SiteExpenses; files = [] },
-      { section = #MaterialExpenses; files = [] },
+      createEmptySection(#TenderDetails),
+      createEmptySection(#LOI),
+      createEmptySection(#RunningBill),
+      createEmptySection(#SiteExpenses),
+      createEmptySection(#MaterialExpenses),
     ];
   };
 
-  func findContract(id : Nat) : ?Contract {
-    contractsArray.find(func(c : Contract) : Bool { c.id == id });
-  };
-
-  func replaceContract(updated : Contract) {
-    let filtered = contractsArray.filter(func(c : Contract) : Bool { c.id != updated.id });
-    contractsArray := filtered.concat([updated]);
-  };
-
-  public shared ({ caller }) func createContract(name : Text) : async Nat {
+  public shared ({ caller }) func createContract(name : Text, status : Text, contractValue : ?Nat) : async Nat {
     let contractId = nextContractId;
     nextContractId += 1;
 
     let newContract : Contract = {
       id = contractId;
       name;
+      status;
+      contractValue;
       createdAt = Time.now();
-      sections = defaultSections();
+      sections = createAllSections();
     };
 
-    contractsArray := contractsArray.concat([newContract]);
+    contracts := contracts.concat([newContract]);
     contractId;
   };
 
-  public query ({ caller }) func getAllContracts() : async [ContractResponse] {
-    let mapped : [ContractResponse] = contractsArray.map(
-      func(c : Contract) : ContractResponse {
-        {
-          id = c.id;
-          name = c.name;
-          createdAt = c.createdAt;
-        };
-      }
-    );
-    mapped.sort(func(a : ContractResponse, b : ContractResponse) : Order.Order {
-      Int.compare(b.createdAt, a.createdAt)
-    });
+  module ContractResponse {
+    public func compare(a : ContractResponse, b : ContractResponse) : Order.Order {
+      Int.compare(b.createdAt, a.createdAt);
+    };
   };
 
-  public query ({ caller }) func getContract(id : Nat) : async ContractResponse {
-    switch (findContract(id)) {
-      case (null) { Runtime.trap("Contract not found") };
-      case (?contract) {
+  public query ({ caller }) func getAllContracts() : async [ContractResponse] {
+    contracts.map(
+      func(contract) {
         {
           id = contract.id;
           name = contract.name;
+          status = contract.status;
+          contractValue = contract.contractValue;
           createdAt = contract.createdAt;
+        };
+      }
+    ).sort();
+  };
+
+  public query ({ caller }) func getContract(id : Nat) : async ContractResponse {
+    let contract = contracts.find(func(c) { c.id == id });
+    switch (contract) {
+      case (null) { Runtime.trap("Contract not found") };
+      case (?c) {
+        {
+          id = c.id;
+          name = c.name;
+          status = c.status;
+          contractValue = c.contractValue;
+          createdAt = c.createdAt;
         };
       };
     };
   };
 
   public shared ({ caller }) func deleteContract(id : Nat) : async () {
-    let filtered = contractsArray.filter(func(c : Contract) : Bool { c.id != id });
-    if (filtered.size() == contractsArray.size()) {
+    let initialSize = contracts.size();
+    contracts := contracts.filter(
+      func(c) { c.id != id }
+    );
+    if (contracts.size() == initialSize) {
       Runtime.trap("Contract not found for deletion");
-    } else {
-      contractsArray := filtered;
+    };
+  };
+
+  public shared ({ caller }) func updateContract(id : Nat, name : Text, status : Text, contractValue : ?Nat) : async () {
+    let contractIndex = contracts.findIndex(
+      func(c) { c.id == id }
+    );
+
+    switch (contractIndex) {
+      case (null) { Runtime.trap("Contract not found") };
+      case (?index) {
+        let existingContract = contracts[index];
+        let updatedContract : Contract = {
+          id = existingContract.id;
+          name;
+          status;
+          contractValue;
+          createdAt = existingContract.createdAt;
+          sections = existingContract.sections;
+        };
+
+        contracts := Array.tabulate<Contract>(
+          contracts.size(),
+          func(i) {
+            if (i == index) { updatedContract } else { contracts[i] };
+          },
+        );
+      };
     };
   };
 
@@ -138,35 +171,59 @@ actor {
     filename : Text,
     fileType : Text,
   ) : async () {
-    switch (findContract(contractId)) {
-      case (null) { Runtime.trap("Contract not found") };
-      case (?cv) {
-        let newFile : FileRef = {
-          fileId;
-          blob;
-          filename;
-          fileType;
-          uploadedAt = Time.now();
-        };
+    let contractIndex = contracts.findIndex(
+      func(c) { c.id == contractId }
+    );
 
-        let updatedSections : [SectionEntry] = cv.sections.map(
-          func(se : SectionEntry) : SectionEntry {
-            if (sectionEq(se.section, section)) {
-              { se with files = se.files.concat([newFile]) };
-            } else {
-              se;
-            };
-          }
+    switch (contractIndex) {
+      case (null) { Runtime.trap("Contract not found") };
+      case (?index) {
+        let contract = contracts[index];
+        let sectionIndex = contract.sections.findIndex(
+          func(s) { s.sectionType == section }
         );
 
-        let updatedContract : Contract = {
-          id = cv.id;
-          name = cv.name;
-          createdAt = cv.createdAt;
-          sections = updatedSections;
-        };
+        switch (sectionIndex) {
+          case (null) { Runtime.trap("Section not found") };
+          case (?secIndex) {
+            let newFile : FileRef = {
+              fileId;
+              blob;
+              filename;
+              fileType;
+              uploadedAt = Time.now();
+            };
 
-        replaceContract(updatedContract);
+            let updatedSections = Array.tabulate(
+              contract.sections.size(),
+              func(i) {
+                if (i == secIndex) {
+                  {
+                    sectionType = section;
+                    files = contract.sections[i].files.concat([newFile]);
+                    notes = contract.sections[i].notes;
+                  };
+                } else { contract.sections[i] };
+              },
+            );
+
+            let updatedContract : Contract = {
+              id = contract.id;
+              name = contract.name;
+              status = contract.status;
+              contractValue = contract.contractValue;
+              createdAt = contract.createdAt;
+              sections = updatedSections;
+            };
+
+            contracts := Array.tabulate<Contract>(
+              contracts.size(),
+              func(i) {
+                if (i == index) { updatedContract } else { contracts[i] };
+              },
+            );
+          };
+        };
       };
     };
   };
@@ -174,13 +231,22 @@ actor {
   public query ({ caller }) func getSectionFiles(
     contractId : Nat,
     section : SectionType,
-  ) : async [FileRef] {
-    switch (findContract(contractId)) {
+  ) : async { files : [FileRef]; notes : Text } {
+    let contract = contracts.find(func(c) { c.id == contractId });
+    switch (contract) {
       case (null) { Runtime.trap("Contract not found") };
-      case (?cv) {
-        switch (cv.sections.find(func(se : SectionEntry) : Bool { sectionEq(se.section, section) })) {
-          case (null) { [] };
-          case (?se) { se.files };
+      case (?c) {
+        let sectionEntry = c.sections.find(
+          func(s) { s.sectionType == section }
+        );
+        switch (sectionEntry) {
+          case (null) { Runtime.trap("Section not found") };
+          case (?s) {
+            {
+              files = s.files;
+              notes = s.notes;
+            };
+          };
         };
       };
     };
@@ -191,28 +257,128 @@ actor {
     section : SectionType,
     fileId : Text,
   ) : async () {
-    switch (findContract(contractId)) {
+    let contractIndex = contracts.findIndex(
+      func(c) { c.id == contractId }
+    );
+
+    switch (contractIndex) {
       case (null) { Runtime.trap("Contract not found") };
-      case (?cv) {
-        let newSections : [SectionEntry] = cv.sections.map(
-          func(se : SectionEntry) : SectionEntry {
-            if (sectionEq(se.section, section)) {
-              let newFiles = se.files.filter(func(f : FileRef) : Bool { f.fileId != fileId });
-              { se with files = newFiles };
-            } else {
-              se;
-            };
-          }
+      case (?index) {
+        let contract = contracts[index];
+        let sectionIndex = contract.sections.findIndex(
+          func(s) { s.sectionType == section }
         );
 
-        let updatedContract : Contract = {
-          id = cv.id;
-          name = cv.name;
-          createdAt = cv.createdAt;
-          sections = newSections;
-        };
+        switch (sectionIndex) {
+          case (null) { Runtime.trap("Section not found") };
+          case (?secIndex) {
+            let updatedSections = Array.tabulate(
+              contract.sections.size(),
+              func(i) {
+                if (i == secIndex) {
+                  {
+                    sectionType = section;
+                    files = contract.sections[i].files.filter(
+                      func(f) { f.fileId != fileId }
+                    );
+                    notes = contract.sections[i].notes;
+                  };
+                } else { contract.sections[i] };
+              },
+            );
 
-        replaceContract(updatedContract);
+            let updatedContract : Contract = {
+              id = contract.id;
+              name = contract.name;
+              status = contract.status;
+              contractValue = contract.contractValue;
+              createdAt = contract.createdAt;
+              sections = updatedSections;
+            };
+
+            contracts := Array.tabulate<Contract>(
+              contracts.size(),
+              func(i) {
+                if (i == index) { updatedContract } else { contracts[i] };
+              },
+            );
+          };
+        };
+      };
+    };
+  };
+
+  public shared ({ caller }) func updateSectionNotes(
+    contractId : Nat,
+    section : SectionType,
+    notes : Text,
+  ) : async () {
+    let contractIndex = contracts.findIndex(
+      func(c) { c.id == contractId }
+    );
+
+    switch (contractIndex) {
+      case (null) { Runtime.trap("Contract not found") };
+      case (?index) {
+        let contract = contracts[index];
+        let sectionIndex = contract.sections.findIndex(
+          func(s) { s.sectionType == section }
+        );
+
+        switch (sectionIndex) {
+          case (null) { Runtime.trap("Section not found") };
+          case (?secIndex) {
+            let updatedSections = Array.tabulate(
+              contract.sections.size(),
+              func(i) {
+                if (i == secIndex) {
+                  {
+                    sectionType = section;
+                    files = contract.sections[i].files;
+                    notes;
+                  };
+                } else { contract.sections[i] };
+              },
+            );
+
+            let updatedContract : Contract = {
+              id = contract.id;
+              name = contract.name;
+              status = contract.status;
+              contractValue = contract.contractValue;
+              createdAt = contract.createdAt;
+              sections = updatedSections;
+            };
+
+            contracts := Array.tabulate<Contract>(
+              contracts.size(),
+              func(i) {
+                if (i == index) { updatedContract } else { contracts[i] };
+              },
+            );
+          };
+        };
+      };
+    };
+  };
+
+  public query ({ caller }) func getContractFileCounts(id : Nat) : async [(Text, Nat)] {
+    let contract = contracts.find(func(c) { c.id == id });
+    switch (contract) {
+      case (null) { Runtime.trap("Contract not found") };
+      case (?c) {
+        c.sections.map(
+          func(section) {
+            let sectionLabel = switch (section.sectionType) {
+              case (#TenderDetails) { "Tender Details" };
+              case (#LOI) { "LOI" };
+              case (#RunningBill) { "Running Bill" };
+              case (#SiteExpenses) { "Site Expenses" };
+              case (#MaterialExpenses) { "Material Expenses" };
+            };
+            (sectionLabel, section.files.size());
+          }
+        );
       };
     };
   };

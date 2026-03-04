@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate, useParams } from "@tanstack/react-router";
@@ -11,87 +12,14 @@ import {
   Package,
   Receipt,
   Train,
-  TrendingUp,
 } from "lucide-react";
 import { motion } from "motion/react";
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SectionType } from "../backend";
-import type { ContractResponse, FileRef } from "../backend";
+import type { ContractResponse } from "../backend.d";
 import SectionDrawer from "../components/app/SectionDrawer";
 import { useActor } from "../hooks/useActor";
-import {
-  type SpreadsheetData,
-  computeColumnTotals,
-  findPrimaryAmountColumnIndex,
-  parseXlsxFromUrl,
-} from "../utils/xlsxLoader";
-
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean; error: Error | null }
-> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div
-          style={{
-            minHeight: "100vh",
-            background: "#fff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "2rem",
-          }}
-        >
-          <div style={{ maxWidth: 400, textAlign: "center" }}>
-            <p
-              style={{
-                color: "#ef4444",
-                fontSize: "1.125rem",
-                fontWeight: 600,
-                marginBottom: "0.5rem",
-              }}
-            >
-              Something went wrong
-            </p>
-            <p
-              style={{
-                color: "#6b7280",
-                fontSize: "0.875rem",
-                marginBottom: "1.5rem",
-              }}
-            >
-              {this.state.error?.message}
-            </p>
-            <button
-              type="button"
-              style={{
-                padding: "0.5rem 1rem",
-                background: "#f59e0b",
-                color: "#000",
-                borderRadius: "0.5rem",
-                border: "none",
-                cursor: "pointer",
-              }}
-              onClick={() => window.history.back()}
-            >
-              Go back
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 interface SectionMeta {
   type: SectionType;
@@ -105,36 +33,6 @@ interface SectionMeta {
 }
 
 const SKELETON_KEYS = ["sk1", "sk2", "sk3", "sk4", "sk5"];
-
-function computeSectionTotal(data: SpreadsheetData): number {
-  const totals = computeColumnTotals(data);
-  const primaryIdx = findPrimaryAmountColumnIndex(data.headers);
-  if (primaryIdx !== -1 && totals[primaryIdx] !== null) {
-    return totals[primaryIdx] as number;
-  }
-  return totals.reduce<number>((acc, val) => acc + (val ?? 0), 0);
-}
-
-function formatIndianCurrency(value: number): string {
-  return `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-}
-
-function findMostRecentXlsx(files: FileRef[]): FileRef | null {
-  const xlsxFiles = files
-    .filter(
-      (f) =>
-        f.fileType.toLowerCase() === "xlsx" ||
-        f.fileType.toLowerCase() === "xls",
-    )
-    .sort((a, b) => Number(b.uploadedAt - a.uploadedAt));
-  return xlsxFiles[0] ?? null;
-}
-
-interface ExpenseSummaryState {
-  siteTotal: number | null;
-  materialTotal: number | null;
-  isLoading: boolean;
-}
 
 const SECTIONS: SectionMeta[] = [
   {
@@ -189,43 +87,58 @@ const SECTIONS: SectionMeta[] = [
   },
 ];
 
-export default function ContractDetailPage() {
-  return (
-    <ErrorBoundary>
-      <ContractDetailPageInner />
-    </ErrorBoundary>
-  );
+function formatIndianCurrency(value: bigint): string {
+  const num = Number(value);
+  return new Intl.NumberFormat("en-IN", {
+    maximumFractionDigits: 0,
+  }).format(num);
 }
 
-function ContractDetailPageInner() {
+function getStatusBadgeClass(status: string): string {
+  switch (status) {
+    case "Active":
+      return "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30";
+    case "On Hold":
+      return "bg-amber-500/15 text-amber-400 border border-amber-500/30";
+    case "Completed":
+      return "bg-blue-500/15 text-blue-400 border border-blue-500/30";
+    default:
+      return "bg-muted text-muted-foreground border border-border";
+  }
+}
+
+export default function ContractDetailPage() {
   const navigate = useNavigate();
-  const { id } = useParams({ from: "/contract/$id" });
-  const { actor, isFetching } = useActor();
+  const { id } = useParams({ strict: false }) as { id: string };
+  const { actor } = useActor();
 
   const [contract, setContract] = useState<ContractResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<SectionMeta | null>(null);
-  const [expenseSummary, setExpenseSummary] = useState<ExpenseSummaryState>({
-    siteTotal: null,
-    materialTotal: null,
-    isLoading: false,
-  });
+  const [fileCounts, setFileCounts] = useState<Map<string, number>>(new Map());
 
-  let contractId: bigint | null = null;
-  try {
-    if (id && id !== "undefined") {
-      contractId = BigInt(id);
-    }
-  } catch {
-    // will be handled below
-  }
+  // Track which actor instance we've already fetched for — prevents re-fetch
+  // on every actor invalidation cycle triggered by useActor's internal effect.
+  const fetchedForActorRef = useRef<object | null>(null);
+
+  const contractId = id ? BigInt(id) : null;
 
   const fetchContract = useCallback(async () => {
     if (!actor || !contractId) return;
     try {
       setIsLoading(true);
-      const result = await actor.getContract(contractId);
+      const [result, counts] = await Promise.all([
+        actor.getContract(contractId),
+        actor
+          .getContractFileCounts(contractId)
+          .catch(() => [] as Array<[string, bigint]>),
+      ]);
       setContract(result);
+      const countMap = new Map<string, number>();
+      for (const [section, count] of counts) {
+        countMap.set(section, Number(count));
+      }
+      setFileCounts(countMap);
     } catch (err) {
       toast.error("Failed to load contract");
       console.error(err);
@@ -236,59 +149,14 @@ function ContractDetailPageInner() {
   }, [actor, contractId, navigate]);
 
   useEffect(() => {
-    if (actor && !isFetching && contractId) {
+    // Only fetch once per actor instance + contractId combination.
+    // useActor's internal invalidation loop re-provides the same actor object
+    // reference each time; we guard against duplicate fetches here.
+    if (actor && contractId && fetchedForActorRef.current !== actor) {
+      fetchedForActorRef.current = actor;
       fetchContract();
     }
-  }, [actor, isFetching, contractId, fetchContract]);
-
-  // Fetch & parse expense totals
-  useEffect(() => {
-    if (!actor || isFetching || !contractId) return;
-
-    setExpenseSummary({
-      siteTotal: null,
-      materialTotal: null,
-      isLoading: true,
-    });
-
-    Promise.all([
-      actor.getSectionFiles(contractId, SectionType.SiteExpenses),
-      actor.getSectionFiles(contractId, SectionType.MaterialExpenses),
-    ])
-      .then(async ([siteFiles, materialFiles]) => {
-        const [siteXlsx, materialXlsx] = [
-          findMostRecentXlsx(siteFiles),
-          findMostRecentXlsx(materialFiles),
-        ];
-
-        const [siteData, materialData] = await Promise.all([
-          siteXlsx
-            ? parseXlsxFromUrl(siteXlsx.blob.getDirectURL()).catch(() => null)
-            : Promise.resolve(null),
-          materialXlsx
-            ? parseXlsxFromUrl(materialXlsx.blob.getDirectURL()).catch(
-                () => null,
-              )
-            : Promise.resolve(null),
-        ]);
-
-        setExpenseSummary({
-          siteTotal: siteData ? computeSectionTotal(siteData) : null,
-          materialTotal: materialData
-            ? computeSectionTotal(materialData)
-            : null,
-          isLoading: false,
-        });
-      })
-      .catch((err) => {
-        console.error("Failed to load expense summary:", err);
-        setExpenseSummary({
-          siteTotal: null,
-          materialTotal: null,
-          isLoading: false,
-        });
-      });
-  }, [actor, isFetching, contractId]);
+  }, [actor, contractId, fetchContract]);
 
   const containerVariants = {
     hidden: {},
@@ -306,36 +174,19 @@ function ContractDetailPageInner() {
     },
   };
 
-  if (!id || id === "undefined" || contractId === null) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "oklch(0.16 0.012 250)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div style={{ textAlign: "center", color: "#fff" }}>
-          <p style={{ marginBottom: "1rem" }}>Contract not found</p>
-          <button
-            type="button"
-            onClick={() => navigate({ to: "/" })}
-            style={{
-              padding: "0.5rem 1rem",
-              background: "#f59e0b",
-              color: "#000",
-              borderRadius: "0.5rem",
-              border: "none",
-              cursor: "pointer",
-            }}
-          >
-            Back to contracts
-          </button>
-        </div>
-      </div>
-    );
+  // Map SectionType enum values to the string keys returned by getContractFileCounts.
+  // The backend returns human-readable labels: "Tender Details", "LOI", etc.
+  function getSectionFileCount(sectionType: SectionType): number {
+    const labelMap: Record<string, string> = {
+      TenderDetails: "Tender Details",
+      LOI: "LOI",
+      RunningBill: "Running Bill",
+      SiteExpenses: "Site Expenses",
+      MaterialExpenses: "Material Expenses",
+    };
+    const key = String(sectionType);
+    const label = labelMap[key] ?? key;
+    return fileCounts.get(label) ?? 0;
   }
 
   return (
@@ -350,6 +201,7 @@ function ContractDetailPageInner() {
             onClick={() => navigate({ to: "/" })}
             className="shrink-0 h-9 w-9 hover:bg-secondary"
             aria-label="Back to contracts"
+            data-ocid="contract.back.button"
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
@@ -367,6 +219,7 @@ function ContractDetailPageInner() {
                     type="button"
                     className="hover:text-foreground cursor-pointer transition-colors bg-transparent border-0 p-0 text-sm text-muted-foreground font-body"
                     onClick={() => navigate({ to: "/" })}
+                    data-ocid="contract.breadcrumb.link"
                   >
                     Contracts
                   </button>
@@ -400,14 +253,34 @@ function ContractDetailPageInner() {
               >
                 {contract?.name}
               </motion.h2>
-              <motion.p
+              <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.4, delay: 0.1 }}
-                className="text-muted-foreground font-body mt-1.5 text-sm"
+                className="flex flex-wrap items-center gap-3 mt-2"
               >
-                Manage documents and expenses for this contract
-              </motion.p>
+                {contract?.status && (
+                  <span
+                    className={`inline-flex items-center text-[11px] font-cabinet font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${getStatusBadgeClass(contract.status)}`}
+                    data-ocid="contract.status.card"
+                  >
+                    {contract.status}
+                  </span>
+                )}
+                {contract?.contractValue !== undefined &&
+                  contract?.contractValue !== null && (
+                    <span
+                      className="inline-flex items-center gap-1 text-xs font-body font-semibold text-primary bg-primary/10 border border-primary/25 px-2.5 py-1 rounded-full"
+                      data-ocid="contract.value.card"
+                    >
+                      <IndianRupee className="w-3 h-3" />
+                      {formatIndianCurrency(contract.contractValue)}
+                    </span>
+                  )}
+                <span className="text-muted-foreground font-body text-sm">
+                  Manage documents and expenses for this contract
+                </span>
+              </motion.div>
             </>
           )}
         </div>
@@ -425,145 +298,71 @@ function ContractDetailPageInner() {
             variants={containerVariants}
             initial="hidden"
             animate="visible"
+            data-ocid="contract.sections.list"
           >
-            {SECTIONS.map((section) => (
-              <motion.div key={section.type} variants={itemVariants}>
-                <button
-                  type="button"
-                  className={`w-full text-left group relative bg-card border border-border rounded-xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${section.borderHoverClass}`}
-                  style={{ boxShadow: "0 2px 12px -2px rgba(0,0,0,0.3)" }}
-                  onClick={() => setActiveSection(section)}
+            {SECTIONS.map((section, idx) => {
+              const fileCount = getSectionFileCount(section.type);
+              return (
+                <motion.div
+                  key={section.type}
+                  variants={itemVariants}
+                  data-ocid={`contract.section.item.${idx + 1}`}
                 >
-                  {/* Icon */}
-                  <div
-                    className={`w-12 h-12 rounded-lg border flex items-center justify-center mb-4 transition-all duration-200 group-hover:scale-105 ${section.accentClass}`}
+                  <button
+                    type="button"
+                    className={`w-full text-left group relative bg-card border border-border rounded-xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${section.borderHoverClass}`}
+                    style={{ boxShadow: "0 2px 12px -2px rgba(0,0,0,0.3)" }}
+                    onClick={() => setActiveSection(section)}
+                    data-ocid={`contract.section.button.${idx + 1}`}
                   >
-                    {section.icon}
-                  </div>
-
-                  {/* Label */}
-                  <h3 className="font-display font-bold text-base text-foreground mb-1">
-                    {section.label}
-                  </h3>
-
-                  {/* Description */}
-                  <p className="text-xs text-muted-foreground font-body leading-relaxed">
-                    {section.description}
-                  </p>
-
-                  {/* Expense badge */}
-                  {section.isExpense && (
-                    <span className="absolute top-3 right-3 text-[10px] font-cabinet font-bold uppercase tracking-wider text-primary bg-primary/15 border border-primary/25 px-2 py-0.5 rounded-full">
-                      Expense
-                    </span>
-                  )}
-
-                  {/* Arrow indicator */}
-                  <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                  </div>
-
-                  {/* Bottom indicator line */}
-                  <div
-                    className={`absolute bottom-0 left-4 right-4 h-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 ${section.indicatorClass}`}
-                  />
-                </button>
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
-        {/* Expense Summary */}
-        {!isLoading && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.4 }}
-            className="mt-8"
-          >
-            <div className="flex items-center gap-2.5 mb-4">
-              <TrendingUp className="w-5 h-5 text-primary" />
-              <h3 className="font-display font-bold text-lg text-foreground">
-                Expense Summary
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* Site Expenses Total */}
-              <div className="bg-card border border-border rounded-xl p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/25 flex items-center justify-center">
-                    <HardHat className="w-4 h-4 text-amber-400" />
-                  </div>
-                  <p className="text-xs font-cabinet font-bold uppercase tracking-wider text-muted-foreground">
-                    Site Expenses
-                  </p>
-                </div>
-                {expenseSummary.isLoading ? (
-                  <Skeleton className="h-8 w-32 bg-secondary" />
-                ) : expenseSummary.siteTotal !== null ? (
-                  <p className="font-display font-extrabold text-2xl text-amber-400 tracking-tight">
-                    {formatIndianCurrency(expenseSummary.siteTotal)}
-                  </p>
-                ) : (
-                  <p className="text-sm font-body text-muted-foreground italic">
-                    No data
-                  </p>
-                )}
-              </div>
-
-              {/* Material Expenses Total */}
-              <div className="bg-card border border-border rounded-xl p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 rounded-lg bg-orange-500/15 border border-orange-500/25 flex items-center justify-center">
-                    <Package className="w-4 h-4 text-orange-400" />
-                  </div>
-                  <p className="text-xs font-cabinet font-bold uppercase tracking-wider text-muted-foreground">
-                    Material Expenses
-                  </p>
-                </div>
-                {expenseSummary.isLoading ? (
-                  <Skeleton className="h-8 w-32 bg-secondary" />
-                ) : expenseSummary.materialTotal !== null ? (
-                  <p className="font-display font-extrabold text-2xl text-orange-400 tracking-tight">
-                    {formatIndianCurrency(expenseSummary.materialTotal)}
-                  </p>
-                ) : (
-                  <p className="text-sm font-body text-muted-foreground italic">
-                    No data
-                  </p>
-                )}
-              </div>
-
-              {/* Grand Total */}
-              <div className="bg-primary/10 border border-primary/30 rounded-xl p-5 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
-                <div className="relative">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/35 flex items-center justify-center">
-                      <IndianRupee className="w-4 h-4 text-primary" />
+                    {/* Icon */}
+                    <div
+                      className={`w-12 h-12 rounded-lg border flex items-center justify-center mb-4 transition-all duration-200 group-hover:scale-105 ${section.accentClass}`}
+                    >
+                      {section.icon}
                     </div>
-                    <p className="text-xs font-cabinet font-bold uppercase tracking-wider text-primary/80">
-                      Grand Total
+
+                    {/* Label */}
+                    <h3 className="font-display font-bold text-base text-foreground mb-1">
+                      {section.label}
+                    </h3>
+
+                    {/* Description */}
+                    <p className="text-xs text-muted-foreground font-body leading-relaxed">
+                      {section.description}
                     </p>
-                  </div>
-                  {expenseSummary.isLoading ? (
-                    <Skeleton className="h-9 w-36 bg-primary/20" />
-                  ) : expenseSummary.siteTotal !== null ||
-                    expenseSummary.materialTotal !== null ? (
-                    <p className="font-display font-extrabold text-3xl text-primary tracking-tight">
-                      {formatIndianCurrency(
-                        (expenseSummary.siteTotal ?? 0) +
-                          (expenseSummary.materialTotal ?? 0),
-                      )}
-                    </p>
-                  ) : (
-                    <p className="text-sm font-body text-muted-foreground italic">
-                      Upload expense sheets to see totals
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+
+                    {/* Expense badge */}
+                    {section.isExpense && (
+                      <span className="absolute top-3 right-3 text-[10px] font-cabinet font-bold uppercase tracking-wider text-primary bg-primary/15 border border-primary/25 px-2 py-0.5 rounded-full">
+                        Expense
+                      </span>
+                    )}
+
+                    {/* File count badge */}
+                    {fileCount > 0 && (
+                      <div className="absolute bottom-3 right-3">
+                        <span className="text-[10px] font-body font-semibold text-muted-foreground bg-secondary border border-border px-2 py-0.5 rounded-full">
+                          {fileCount} file{fileCount !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Arrow indicator */}
+                    {fileCount === 0 && (
+                      <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                    )}
+
+                    {/* Bottom indicator line */}
+                    <div
+                      className={`absolute bottom-0 left-4 right-4 h-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 ${section.indicatorClass}`}
+                    />
+                  </button>
+                </motion.div>
+              );
+            })}
           </motion.div>
         )}
       </main>
@@ -573,7 +372,22 @@ function ContractDetailPageInner() {
         <SectionDrawer
           contractId={contractId}
           section={activeSection}
-          onClose={() => setActiveSection(null)}
+          onClose={() => {
+            setActiveSection(null);
+            // Refresh file counts after drawer closes
+            if (actor && contractId) {
+              actor
+                .getContractFileCounts(contractId)
+                .then((counts) => {
+                  const countMap = new Map<string, number>();
+                  for (const [section, count] of counts) {
+                    countMap.set(section, Number(count));
+                  }
+                  setFileCounts(countMap);
+                })
+                .catch(() => {});
+            }
+          }}
         />
       )}
 
