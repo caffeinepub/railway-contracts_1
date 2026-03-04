@@ -14,10 +14,10 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { SectionType } from "../backend.d";
-import type { ContractResponse, FileRef } from "../backend.d";
+import { SectionType } from "../backend";
+import type { ContractResponse, FileRef } from "../backend";
 import SectionDrawer from "../components/app/SectionDrawer";
 import { useActor } from "../hooks/useActor";
 import {
@@ -26,6 +26,72 @@ import {
   findPrimaryAmountColumnIndex,
   parseXlsxFromUrl,
 } from "../utils/xlsxLoader";
+
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div
+          style={{
+            minHeight: "100vh",
+            background: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "2rem",
+          }}
+        >
+          <div style={{ maxWidth: 400, textAlign: "center" }}>
+            <p
+              style={{
+                color: "#ef4444",
+                fontSize: "1.125rem",
+                fontWeight: 600,
+                marginBottom: "0.5rem",
+              }}
+            >
+              Something went wrong
+            </p>
+            <p
+              style={{
+                color: "#6b7280",
+                fontSize: "0.875rem",
+                marginBottom: "1.5rem",
+              }}
+            >
+              {this.state.error?.message}
+            </p>
+            <button
+              type="button"
+              style={{
+                padding: "0.5rem 1rem",
+                background: "#f59e0b",
+                color: "#000",
+                borderRadius: "0.5rem",
+                border: "none",
+                cursor: "pointer",
+              }}
+              onClick={() => window.history.back()}
+            >
+              Go back
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface SectionMeta {
   type: SectionType;
@@ -124,8 +190,16 @@ const SECTIONS: SectionMeta[] = [
 ];
 
 export default function ContractDetailPage() {
+  return (
+    <ErrorBoundary>
+      <ContractDetailPageInner />
+    </ErrorBoundary>
+  );
+}
+
+function ContractDetailPageInner() {
   const navigate = useNavigate();
-  const { id } = useParams({ strict: false }) as { id: string };
+  const { id } = useParams({ from: "/contract/$id" });
   const { actor, isFetching } = useActor();
 
   const [contract, setContract] = useState<ContractResponse | null>(null);
@@ -137,7 +211,14 @@ export default function ContractDetailPage() {
     isLoading: false,
   });
 
-  const contractId = id ? BigInt(id) : null;
+  let contractId: bigint | null = null;
+  try {
+    if (id && id !== "undefined") {
+      contractId = BigInt(id);
+    }
+  } catch {
+    // will be handled below
+  }
 
   const fetchContract = useCallback(async () => {
     if (!actor || !contractId) return;
@@ -224,6 +305,38 @@ export default function ContractDetailPage() {
       transition: { duration: 0.35 },
     },
   };
+
+  if (!id || id === "undefined" || contractId === null) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "oklch(0.16 0.012 250)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div style={{ textAlign: "center", color: "#fff" }}>
+          <p style={{ marginBottom: "1rem" }}>Contract not found</p>
+          <button
+            type="button"
+            onClick={() => navigate({ to: "/" })}
+            style={{
+              padding: "0.5rem 1rem",
+              background: "#f59e0b",
+              color: "#000",
+              borderRadius: "0.5rem",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            Back to contracts
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background track-pattern">

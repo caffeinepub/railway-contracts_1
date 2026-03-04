@@ -1,72 +1,15 @@
-import Map "mo:core/Map";
-import Nat "mo:core/Nat";
 import Int "mo:core/Int";
-import Time "mo:core/Time";
-import Runtime "mo:core/Runtime";
 import Order "mo:core/Order";
-import Array "mo:core/Array";
+import Time "mo:core/Time";
 import Text "mo:core/Text";
+import Runtime "mo:core/Runtime";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
+import Migration "migration";
 
-
-
+(with migration = Migration.run)
 actor {
   include MixinStorage();
-
-  module SectionType {
-    public func toText(section : SectionType) : Text {
-      switch (section) {
-        case (#TenderDetails) { "TenderDetails" };
-        case (#LOI) { "LOI" };
-        case (#RunningBill) { "RunningBill" };
-        case (#SiteExpenses) { "SiteExpenses" };
-        case (#MaterialExpenses) { "MaterialExpenses" };
-      };
-    };
-
-    public func fromText(text : Text) : SectionType {
-      switch (text) {
-        case ("TenderDetails") { #TenderDetails };
-        case ("LOI") { #LOI };
-        case ("RunningBill") { #RunningBill };
-        case ("SiteExpenses") { #SiteExpenses };
-        case ("MaterialExpenses") { #MaterialExpenses };
-        case (_) { Runtime.trap("Invalid SectionType text") };
-      };
-    };
-
-    public func compare(a : SectionType, b : SectionType) : Order.Order {
-      Text.compare(toText(a), toText(b));
-    };
-  };
-
-  module FileRef {
-    public func compare(file1 : FileRef, file2 : FileRef) : Order.Order {
-      switch (Int.compare(file1.uploadedAt, file2.uploadedAt)) {
-        case (#equal) { Text.compare(file1.fileId, file2.fileId) };
-        case (order) { order };
-      };
-    };
-  };
-
-  module Sections {
-    public func empty() : Sections {
-      let sectionsMap = Map.empty<SectionType, [FileRef]>();
-      sectionsMap.add(#TenderDetails, []);
-      sectionsMap.add(#LOI, []);
-      sectionsMap.add(#RunningBill, []);
-      sectionsMap.add(#SiteExpenses, []);
-      sectionsMap.add(#MaterialExpenses, []);
-      sectionsMap;
-    }
-  };
-
-  module Contract {
-    public func compare(contract1 : Contract, contract2 : Contract) : Order.Order {
-      Int.compare(contract1.id, contract2.id);
-    };
-  };
 
   public type FileRef = {
     fileId : Text;
@@ -84,13 +27,16 @@ actor {
     #MaterialExpenses;
   };
 
-  public type Sections = Map.Map<SectionType, [FileRef]>;
+  public type SectionEntry = {
+    section : SectionType;
+    files : [FileRef];
+  };
 
   public type Contract = {
     id : Nat;
     name : Text;
     createdAt : Int;
-    sections : Sections;
+    sections : [SectionEntry];
   };
 
   public type ContractResponse = {
@@ -100,8 +46,37 @@ actor {
   };
 
   var nextContractId = 0;
+  var contractsArray : [Contract] = [];
 
-  let contracts = Map.empty<Nat, Contract>();
+  func sectionEq(a : SectionType, b : SectionType) : Bool {
+    switch (a, b) {
+      case (#TenderDetails, #TenderDetails) { true };
+      case (#LOI, #LOI) { true };
+      case (#RunningBill, #RunningBill) { true };
+      case (#SiteExpenses, #SiteExpenses) { true };
+      case (#MaterialExpenses, #MaterialExpenses) { true };
+      case _ { false };
+    };
+  };
+
+  func defaultSections() : [SectionEntry] {
+    [
+      { section = #TenderDetails; files = [] },
+      { section = #LOI; files = [] },
+      { section = #RunningBill; files = [] },
+      { section = #SiteExpenses; files = [] },
+      { section = #MaterialExpenses; files = [] },
+    ];
+  };
+
+  func findContract(id : Nat) : ?Contract {
+    contractsArray.find(func(c : Contract) : Bool { c.id == id });
+  };
+
+  func replaceContract(updated : Contract) {
+    let filtered = contractsArray.filter(func(c : Contract) : Bool { c.id != updated.id });
+    contractsArray := filtered.concat([updated]);
+  };
 
   public shared ({ caller }) func createContract(name : Text) : async Nat {
     let contractId = nextContractId;
@@ -111,31 +86,30 @@ actor {
       id = contractId;
       name;
       createdAt = Time.now();
-      sections = Sections.empty();
+      sections = defaultSections();
     };
 
-    contracts.add(contractId, newContract);
+    contractsArray := contractsArray.concat([newContract]);
     contractId;
   };
 
   public query ({ caller }) func getAllContracts() : async [ContractResponse] {
-    contracts.values().toArray().map(
-      func(contract) {
+    let mapped : [ContractResponse] = contractsArray.map(
+      func(c : Contract) : ContractResponse {
         {
-          id = contract.id;
-          name = contract.name;
-          createdAt = contract.createdAt;
+          id = c.id;
+          name = c.name;
+          createdAt = c.createdAt;
         };
       }
-    ).sort(
-      func(a, b) {
-        Int.compare(b.createdAt, a.createdAt);
-      }
     );
+    mapped.sort(func(a : ContractResponse, b : ContractResponse) : Order.Order {
+      Int.compare(b.createdAt, a.createdAt)
+    });
   };
 
   public query ({ caller }) func getContract(id : Nat) : async ContractResponse {
-    switch (contracts.get(id)) {
+    switch (findContract(id)) {
       case (null) { Runtime.trap("Contract not found") };
       case (?contract) {
         {
@@ -148,10 +122,11 @@ actor {
   };
 
   public shared ({ caller }) func deleteContract(id : Nat) : async () {
-    if (contracts.containsKey(id)) {
-      contracts.remove(id);
-    } else {
+    let filtered = contractsArray.filter(func(c : Contract) : Bool { c.id != id });
+    if (filtered.size() == contractsArray.size()) {
       Runtime.trap("Contract not found for deletion");
+    } else {
+      contractsArray := filtered;
     };
   };
 
@@ -163,9 +138,9 @@ actor {
     filename : Text,
     fileType : Text,
   ) : async () {
-    switch (contracts.get(contractId)) {
+    switch (findContract(contractId)) {
       case (null) { Runtime.trap("Contract not found") };
-      case (?contract) {
+      case (?cv) {
         let newFile : FileRef = {
           fileId;
           blob;
@@ -174,21 +149,24 @@ actor {
           uploadedAt = Time.now();
         };
 
-        let files = switch (contract.sections.get(section)) {
-          case (null) { [newFile] };
-          case (?existingFiles) { existingFiles.concat([newFile]) };
-        };
-
-        contract.sections.add(section, files);
+        let updatedSections : [SectionEntry] = cv.sections.map(
+          func(se : SectionEntry) : SectionEntry {
+            if (sectionEq(se.section, section)) {
+              { se with files = se.files.concat([newFile]) };
+            } else {
+              se;
+            };
+          }
+        );
 
         let updatedContract : Contract = {
-          id = contract.id;
-          name = contract.name;
-          createdAt = contract.createdAt;
-          sections = contract.sections;
+          id = cv.id;
+          name = cv.name;
+          createdAt = cv.createdAt;
+          sections = updatedSections;
         };
 
-        contracts.add(contractId, updatedContract);
+        replaceContract(updatedContract);
       };
     };
   };
@@ -197,12 +175,12 @@ actor {
     contractId : Nat,
     section : SectionType,
   ) : async [FileRef] {
-    switch (contracts.get(contractId)) {
+    switch (findContract(contractId)) {
       case (null) { Runtime.trap("Contract not found") };
-      case (?contract) {
-        switch (contract.sections.get(section)) {
+      case (?cv) {
+        switch (cv.sections.find(func(se : SectionEntry) : Bool { sectionEq(se.section, section) })) {
           case (null) { [] };
-          case (?files) { files };
+          case (?se) { se.files };
         };
       };
     };
@@ -213,30 +191,28 @@ actor {
     section : SectionType,
     fileId : Text,
   ) : async () {
-    switch (contracts.get(contractId)) {
+    switch (findContract(contractId)) {
       case (null) { Runtime.trap("Contract not found") };
-      case (?contract) {
-        switch (contract.sections.get(section)) {
-          case (null) {
-            Runtime.trap("Section not found in contract");
-          };
-          case (?files) {
-            let filteredFiles = files.filter(
-              func(file) { file.fileId != fileId }
-            );
-
-            contract.sections.add(section, filteredFiles);
-
-            let updatedContract : Contract = {
-              id = contract.id;
-              name = contract.name;
-              createdAt = contract.createdAt;
-              sections = contract.sections;
+      case (?cv) {
+        let newSections : [SectionEntry] = cv.sections.map(
+          func(se : SectionEntry) : SectionEntry {
+            if (sectionEq(se.section, section)) {
+              let newFiles = se.files.filter(func(f : FileRef) : Bool { f.fileId != fileId });
+              { se with files = newFiles };
+            } else {
+              se;
             };
+          }
+        );
 
-            contracts.add(contractId, updatedContract);
-          };
+        let updatedContract : Contract = {
+          id = cv.id;
+          name = cv.name;
+          createdAt = cv.createdAt;
+          sections = newSections;
         };
+
+        replaceContract(updatedContract);
       };
     };
   };
