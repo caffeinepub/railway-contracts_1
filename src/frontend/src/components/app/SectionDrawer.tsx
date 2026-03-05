@@ -35,7 +35,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ExternalBlob, type SectionType } from "../../backend";
-import type { FileRef } from "../../backend";
+import type { FileRef, backendInterface } from "../../backend";
 import { useActor } from "../../hooks/useActor";
 import {
   type SpreadsheetData,
@@ -115,12 +115,28 @@ function createEmptyRow(colCount: number): string[] {
   return Array.from({ length: colCount }, () => "");
 }
 
-function ManualEntryTable() {
-  const [headers, setHeaders] = useState<string[]>([...DEFAULT_HEADERS]);
-  const [rows, setRows] = useState<string[][]>(() =>
-    Array.from({ length: DEFAULT_ROW_COUNT }, () =>
-      createEmptyRow(DEFAULT_HEADERS.length),
-    ),
+interface ManualEntryTableProps {
+  initialHeaders?: string[];
+  initialRows?: string[][];
+  isSaving: boolean;
+  onSave: (headers: string[], rows: string[][]) => Promise<void>;
+}
+
+function ManualEntryTable({
+  initialHeaders,
+  initialRows,
+  isSaving,
+  onSave,
+}: ManualEntryTableProps) {
+  const [headers, setHeaders] = useState<string[]>(
+    () => initialHeaders ?? [...DEFAULT_HEADERS],
+  );
+  const [rows, setRows] = useState<string[][]>(
+    () =>
+      initialRows ??
+      Array.from({ length: DEFAULT_ROW_COUNT }, () =>
+        createEmptyRow(DEFAULT_HEADERS.length),
+      ),
   );
 
   function updateHeader(colIdx: number, value: string) {
@@ -165,17 +181,40 @@ function ManualEntryTable() {
             — editable scratch pad
           </span>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={clearAll}
-          className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 gap-1.5"
-          data-ocid="manual-entry.delete_button"
-        >
-          <RotateCcw className="w-3 h-3" />
-          Clear All
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onSave(headers, rows)}
+            disabled={isSaving}
+            className="h-7 px-2 text-xs gap-1.5 text-primary hover:bg-primary/10"
+            data-ocid="manual-entry.save_button"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              <>
+                <Save className="w-3 h-3" />
+                Save
+              </>
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={clearAll}
+            className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 gap-1.5"
+            data-ocid="manual-entry.delete_button"
+          >
+            <RotateCcw className="w-3 h-3" />
+            Clear All
+          </Button>
+        </div>
       </div>
 
       {/* Table */}
@@ -251,7 +290,8 @@ function ManualEntryTable() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function SectionDrawer({ contractId, section, onClose }: Props) {
-  const { actor } = useActor();
+  const { actor: rawActor } = useActor();
+  const actor = rawActor as backendInterface | null;
 
   const [files, setFiles] = useState<FileRef[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
@@ -270,6 +310,14 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
 
   // PDF preview
   const [pdfPreviewFileId, setPdfPreviewFileId] = useState<string | null>(null);
+
+  // Manual entry persistence
+  const [manualEntryData, setManualEntryData] = useState<{
+    headers: string[];
+    rows: string[][];
+  } | null>(null);
+  const [isLoadingManualEntry, setIsLoadingManualEntry] = useState(false);
+  const [isSavingManualEntry, setIsSavingManualEntry] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -299,8 +347,18 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
       fetchFiles();
       setSpreadsheetData(null);
       setPdfPreviewFileId(null);
+      setManualEntryData(null);
+
+      if (section.isExpense) {
+        setIsLoadingManualEntry(true);
+        actor
+          .getManualEntry(contractId, section.type)
+          .then((data) => setManualEntryData(data ?? null))
+          .catch(() => {})
+          .finally(() => setIsLoadingManualEntry(false));
+      }
     }
-  }, [section, actor, fetchFiles]);
+  }, [section, actor, fetchFiles, contractId]);
 
   // Load spreadsheet preview for most recent xlsx (all sections)
   useEffect(() => {
@@ -462,6 +520,20 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
     notesAutoSaveTimer.current = setTimeout(() => {
       saveNotes();
     }, 800);
+  }
+
+  async function handleSaveManualEntry(headers: string[], rows: string[][]) {
+    if (!actor || !section) return;
+    setIsSavingManualEntry(true);
+    try {
+      await actor.saveManualEntry(contractId, section.type, headers, rows);
+      toast.success("Manual entry saved");
+    } catch (err) {
+      toast.error("Failed to save manual entry");
+      console.error(err);
+    } finally {
+      setIsSavingManualEntry(false);
+    }
   }
 
   function togglePdfPreview(fileId: string) {
@@ -886,7 +958,28 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                       <PencilLine className="w-4 h-4" />
                       Quick Entry Table
                     </h3>
-                    <ManualEntryTable />
+                    {isLoadingManualEntry ? (
+                      <div
+                        className="space-y-2"
+                        data-ocid="manual-entry.loading_state"
+                      >
+                        <Skeleton className="h-10 w-full rounded bg-card" />
+                        {[1, 2, 3, 4, 5].map((i) => (
+                          <Skeleton
+                            key={i}
+                            className="h-7 w-full rounded bg-card"
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <ManualEntryTable
+                        key={section.type}
+                        initialHeaders={manualEntryData?.headers}
+                        initialRows={manualEntryData?.rows}
+                        isSaving={isSavingManualEntry}
+                        onSave={handleSaveManualEntry}
+                      />
+                    )}
                   </div>
                 )}
               </div>

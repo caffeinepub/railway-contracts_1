@@ -7,8 +7,6 @@ import Runtime "mo:core/Runtime";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
 
-
-
 actor {
   include MixinStorage();
 
@@ -51,8 +49,26 @@ actor {
     createdAt : Int;
   };
 
-  var nextContractId = 0;
-  var contracts : [Contract] = [];
+  type ManualEntryRecord = {
+    key : Text;
+    headers : [Text];
+    rows : [[Text]];
+  };
+
+  stable var nextContractId = 0;
+  stable var contracts : [Contract] = [];
+  stable var manualEntries : [ManualEntryRecord] = [];
+
+  func sectionKey(contractId : Nat, sectionType : SectionType) : Text {
+    let sectionName = switch (sectionType) {
+      case (#TenderDetails) { "TenderDetails" };
+      case (#LOI) { "LOI" };
+      case (#RunningBill) { "RunningBill" };
+      case (#SiteExpenses) { "SiteExpenses" };
+      case (#MaterialExpenses) { "MaterialExpenses" };
+    };
+    contractId.toText() # ":" # sectionName;
+  };
 
   func findContractIndex(id : Nat) : ?Nat {
     var i = 0;
@@ -402,5 +418,53 @@ actor {
 
   public query ({ caller }) func queryContractsCompatible() : async [Contract] {
     contracts;
+  };
+
+  public query ({ caller }) func getManualEntry(
+    contractId : Nat,
+    section : SectionType,
+  ) : async ?{ headers : [Text]; rows : [[Text]] } {
+    let k = sectionKey(contractId, section);
+    var i = 0;
+    for (entry in manualEntries.values()) {
+      if (entry.key == k) {
+        return ?{ headers = entry.headers; rows = entry.rows };
+      };
+      i += 1;
+    };
+    null;
+  };
+
+  public shared ({ caller }) func saveManualEntry(
+    contractId : Nat,
+    section : SectionType,
+    headers : [Text],
+    rows : [[Text]],
+  ) : async () {
+    let k = sectionKey(contractId, section);
+    var found = false;
+    var idx = 0;
+    for (entry in manualEntries.values()) {
+      if (entry.key == k) {
+        found := true;
+      };
+      if (not found) {
+        idx += 1;
+      };
+    };
+    if (found) {
+      manualEntries := Array.tabulate<ManualEntryRecord>(
+        manualEntries.size(),
+        func(i) {
+          if (i == idx) {
+            { key = k; headers; rows };
+          } else {
+            manualEntries[i];
+          };
+        },
+      );
+    } else {
+      manualEntries := manualEntries.concat([{ key = k; headers; rows }]);
+    };
   };
 };

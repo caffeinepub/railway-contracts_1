@@ -79,6 +79,10 @@ export interface _SERVICE {
   'getAllContracts' : ActorMethod<[], Array<ContractResponse>>,
   'getContract' : ActorMethod<[bigint], ContractResponse>,
   'getContractFileCounts' : ActorMethod<[bigint], Array<[string, bigint]>>,
+  'getManualEntry' : ActorMethod<
+    [bigint, SectionType],
+    [] | [{ 'rows' : Array<Array<string>>, 'headers' : Array<string> }]
+  >,
   'getSectionFiles' : ActorMethod<
     [bigint, SectionType],
     { 'files' : Array<FileRef>, 'notes' : string }
@@ -86,6 +90,10 @@ export interface _SERVICE {
   'queryContractsCompatible' : ActorMethod<[], Array<Contract>>,
   'removeFileFromSection' : ActorMethod<
     [bigint, SectionType, string],
+    undefined
+  >,
+  'saveManualEntry' : ActorMethod<
+    [bigint, SectionType, Array<string>, Array<Array<string>>],
     undefined
   >,
   'seedWithContracts' : ActorMethod<[bigint], undefined>,

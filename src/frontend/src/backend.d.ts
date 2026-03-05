@@ -55,12 +55,17 @@ export interface backendInterface {
     getAllContracts(): Promise<Array<ContractResponse>>;
     getContract(id: bigint): Promise<ContractResponse>;
     getContractFileCounts(id: bigint): Promise<Array<[string, bigint]>>;
+    getManualEntry(contractId: bigint, section: SectionType): Promise<{
+        rows: Array<Array<string>>;
+        headers: Array<string>;
+    } | null>;
     getSectionFiles(contractId: bigint, section: SectionType): Promise<{
         files: Array<FileRef>;
         notes: string;
     }>;
     queryContractsCompatible(): Promise<Array<Contract>>;
     removeFileFromSection(contractId: bigint, section: SectionType, fileId: string): Promise<void>;
+    saveManualEntry(contractId: bigint, section: SectionType, headers: Array<string>, rows: Array<Array<string>>): Promise<void>;
     seedWithContracts(seedCount: bigint): Promise<void>;
     updateContract(id: bigint, name: string, status: string, contractValue: bigint | null): Promise<void>;
     updateSectionNotes(contractId: bigint, section: SectionType, notes: string): Promise<void>;

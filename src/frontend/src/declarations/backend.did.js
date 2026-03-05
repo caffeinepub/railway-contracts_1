@@ -100,6 +100,18 @@ export const idlService = IDL.Service({
       [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
       ['query'],
     ),
+  'getManualEntry' : IDL.Func(
+      [IDL.Nat, SectionType],
+      [
+        IDL.Opt(
+          IDL.Record({
+            'rows' : IDL.Vec(IDL.Vec(IDL.Text)),
+            'headers' : IDL.Vec(IDL.Text),
+          })
+        ),
+      ],
+      ['query'],
+    ),
   'getSectionFiles' : IDL.Func(
       [IDL.Nat, SectionType],
       [IDL.Record({ 'files' : IDL.Vec(FileRef), 'notes' : IDL.Text })],
@@ -107,6 +119,11 @@ export const idlService = IDL.Service({
     ),
   'queryContractsCompatible' : IDL.Func([], [IDL.Vec(Contract)], ['query']),
   'removeFileFromSection' : IDL.Func([IDL.Nat, SectionType, IDL.Text], [], []),
+  'saveManualEntry' : IDL.Func(
+      [IDL.Nat, SectionType, IDL.Vec(IDL.Text), IDL.Vec(IDL.Vec(IDL.Text))],
+      [],
+      [],
+    ),
   'seedWithContracts' : IDL.Func([IDL.Nat], [], []),
   'updateContract' : IDL.Func(
       [IDL.Nat, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat)],
@@ -211,6 +228,18 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
         ['query'],
       ),
+    'getManualEntry' : IDL.Func(
+        [IDL.Nat, SectionType],
+        [
+          IDL.Opt(
+            IDL.Record({
+              'rows' : IDL.Vec(IDL.Vec(IDL.Text)),
+              'headers' : IDL.Vec(IDL.Text),
+            })
+          ),
+        ],
+        ['query'],
+      ),
     'getSectionFiles' : IDL.Func(
         [IDL.Nat, SectionType],
         [IDL.Record({ 'files' : IDL.Vec(FileRef), 'notes' : IDL.Text })],
@@ -219,6 +248,11 @@ export const idlFactory = ({ IDL }) => {
     'queryContractsCompatible' : IDL.Func([], [IDL.Vec(Contract)], ['query']),
     'removeFileFromSection' : IDL.Func(
         [IDL.Nat, SectionType, IDL.Text],
+        [],
+        [],
+      ),
+    'saveManualEntry' : IDL.Func(
+        [IDL.Nat, SectionType, IDL.Vec(IDL.Text), IDL.Vec(IDL.Vec(IDL.Text))],
         [],
         [],
       ),
