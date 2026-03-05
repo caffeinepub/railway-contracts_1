@@ -10,6 +10,14 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface Contract {
+  'id' : bigint,
+  'status' : string,
+  'name' : string,
+  'createdAt' : bigint,
+  'sections' : Array<SectionEntry>,
+  'contractValue' : [] | [bigint],
+}
 export interface ContractResponse {
   'id' : bigint,
   'status' : string,
@@ -24,6 +32,11 @@ export interface FileRef {
   'filename' : string,
   'fileId' : string,
   'uploadedAt' : bigint,
+}
+export interface SectionEntry {
+  'files' : Array<FileRef>,
+  'sectionType' : SectionType,
+  'notes' : string,
 }
 export type SectionType = { 'LOI' : null } |
   { 'MaterialExpenses' : null } |
@@ -70,10 +83,12 @@ export interface _SERVICE {
     [bigint, SectionType],
     { 'files' : Array<FileRef>, 'notes' : string }
   >,
+  'queryContractsCompatible' : ActorMethod<[], Array<Contract>>,
   'removeFileFromSection' : ActorMethod<
     [bigint, SectionType, string],
     undefined
   >,
+  'seedWithContracts' : ActorMethod<[bigint], undefined>,
   'updateContract' : ActorMethod<
     [bigint, string, string, [] | [bigint]],
     undefined

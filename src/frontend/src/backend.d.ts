@@ -21,6 +21,19 @@ export interface ContractResponse {
     createdAt: bigint;
     contractValue?: bigint;
 }
+export interface SectionEntry {
+    files: Array<FileRef>;
+    sectionType: SectionType;
+    notes: string;
+}
+export interface Contract {
+    id: bigint;
+    status: string;
+    name: string;
+    createdAt: bigint;
+    sections: Array<SectionEntry>;
+    contractValue?: bigint;
+}
 export interface FileRef {
     blob: ExternalBlob;
     fileType: string;
@@ -46,7 +59,9 @@ export interface backendInterface {
         files: Array<FileRef>;
         notes: string;
     }>;
+    queryContractsCompatible(): Promise<Array<Contract>>;
     removeFileFromSection(contractId: bigint, section: SectionType, fileId: string): Promise<void>;
+    seedWithContracts(seedCount: bigint): Promise<void>;
     updateContract(id: bigint, name: string, status: string, contractValue: bigint | null): Promise<void>;
     updateSectionNotes(contractId: bigint, section: SectionType, notes: string): Promise<void>;
 }

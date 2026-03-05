@@ -30,6 +30,12 @@
 }
 
 @layer base {
+  html,
+  body {
+    height: auto;
+    overflow-x: hidden;
+  }
+
   :root {
     --radius: 0.5rem;
 

@@ -10,12 +10,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AlertCircle,
   Download,
+  ExternalLink,
   Eye,
   EyeOff,
   FileSpreadsheet,
@@ -179,7 +179,10 @@ function ManualEntryTable() {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto max-h-[360px] overflow-y-auto spreadsheet-preview">
+      <div
+        className="spreadsheet-preview"
+        style={{ overflowX: "auto", overflowY: "auto", maxHeight: "400px" }}
+      >
         <table className="manual-entry-table">
           <thead>
             <tr>
@@ -564,7 +567,7 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
             )}
 
             {/* Scrollable Content */}
-            <ScrollArea className="flex-1">
+            <div className="flex-1 overflow-y-auto">
               <div className="px-6 py-4 space-y-5">
                 {/* ── Notes Section ───────────────────────────────────── */}
                 <div>
@@ -697,6 +700,32 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                                       </Button>
                                     )}
 
+                                    {/* Open in Excel button for xlsx/xls */}
+                                    {(fileRef.fileType.toLowerCase() ===
+                                      "xlsx" ||
+                                      fileRef.fileType.toLowerCase() ===
+                                        "xls") && (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 px-2 text-xs gap-1 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 opacity-70 hover:opacity-100"
+                                        onClick={() => {
+                                          const url =
+                                            fileRef.blob.getDirectURL();
+                                          window.open(url, "_blank");
+                                        }}
+                                        aria-label="Open in Excel"
+                                        title="Open in Excel"
+                                        data-ocid={`section.files.open_modal_button.${fileIdx + 1}`}
+                                      >
+                                        <ExternalLink className="w-3.5 h-3.5" />
+                                        <span className="hidden sm:inline">
+                                          Excel
+                                        </span>
+                                      </Button>
+                                    )}
+
                                     <Button
                                       type="button"
                                       variant="ghost"
@@ -782,7 +811,14 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                           Sheet 1 — {spreadsheetData.rows.length} rows
                         </span>
                       </div>
-                      <div className="overflow-x-auto max-h-[400px] overflow-y-auto spreadsheet-preview">
+                      <div
+                        className="spreadsheet-preview"
+                        style={{
+                          overflowX: "auto",
+                          overflowY: "auto",
+                          maxHeight: "400px",
+                        }}
+                      >
                         {spreadsheetData.headers.length === 0 ? (
                           <div className="py-8 text-center text-sm text-muted-foreground font-body">
                             Spreadsheet appears to be empty
@@ -854,7 +890,7 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                   </div>
                 )}
               </div>
-            </ScrollArea>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

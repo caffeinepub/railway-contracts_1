@@ -41,6 +41,19 @@ export const FileRef = IDL.Record({
   'fileId' : IDL.Text,
   'uploadedAt' : IDL.Int,
 });
+export const SectionEntry = IDL.Record({
+  'files' : IDL.Vec(FileRef),
+  'sectionType' : SectionType,
+  'notes' : IDL.Text,
+});
+export const Contract = IDL.Record({
+  'id' : IDL.Nat,
+  'status' : IDL.Text,
+  'name' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'sections' : IDL.Vec(SectionEntry),
+  'contractValue' : IDL.Opt(IDL.Nat),
+});
 
 export const idlService = IDL.Service({
   '_caffeineStorageBlobIsLive' : IDL.Func(
@@ -92,7 +105,9 @@ export const idlService = IDL.Service({
       [IDL.Record({ 'files' : IDL.Vec(FileRef), 'notes' : IDL.Text })],
       ['query'],
     ),
+  'queryContractsCompatible' : IDL.Func([], [IDL.Vec(Contract)], ['query']),
   'removeFileFromSection' : IDL.Func([IDL.Nat, SectionType, IDL.Text], [], []),
+  'seedWithContracts' : IDL.Func([IDL.Nat], [], []),
   'updateContract' : IDL.Func(
       [IDL.Nat, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat)],
       [],
@@ -136,6 +151,19 @@ export const idlFactory = ({ IDL }) => {
     'filename' : IDL.Text,
     'fileId' : IDL.Text,
     'uploadedAt' : IDL.Int,
+  });
+  const SectionEntry = IDL.Record({
+    'files' : IDL.Vec(FileRef),
+    'sectionType' : SectionType,
+    'notes' : IDL.Text,
+  });
+  const Contract = IDL.Record({
+    'id' : IDL.Nat,
+    'status' : IDL.Text,
+    'name' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'sections' : IDL.Vec(SectionEntry),
+    'contractValue' : IDL.Opt(IDL.Nat),
   });
   
   return IDL.Service({
@@ -188,11 +216,13 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Record({ 'files' : IDL.Vec(FileRef), 'notes' : IDL.Text })],
         ['query'],
       ),
+    'queryContractsCompatible' : IDL.Func([], [IDL.Vec(Contract)], ['query']),
     'removeFileFromSection' : IDL.Func(
         [IDL.Nat, SectionType, IDL.Text],
         [],
         [],
       ),
+    'seedWithContracts' : IDL.Func([IDL.Nat], [], []),
     'updateContract' : IDL.Func(
         [IDL.Nat, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat)],
         [],
