@@ -13,7 +13,7 @@ import {
   TrendingDown,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { ContractResponse } from "../backend.d";
 import SectionDrawer from "../components/app/SectionDrawer";
@@ -118,10 +118,6 @@ export default function ContractDetailPage() {
   const [activeSection, setActiveSection] = useState<SectionMeta | null>(null);
   const [fileCounts, setFileCounts] = useState<Map<string, number>>(new Map());
 
-  // Track which actor instance we've already fetched for — prevents re-fetch
-  // on every actor invalidation cycle triggered by useActor's internal effect.
-  const fetchedForActorRef = useRef<object | null>(null);
-
   const contractId = id ? BigInt(id) : null;
 
   const fetchContract = useCallback(async () => {
@@ -149,15 +145,13 @@ export default function ContractDetailPage() {
     }
   }, [actor, contractId, navigate]);
 
+  // Fetch whenever actor becomes available (handles cold starts and rerenders).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional - only fire on actor change
   useEffect(() => {
-    // Only fetch once per actor instance + contractId combination.
-    // useActor's internal invalidation loop re-provides the same actor object
-    // reference each time; we guard against duplicate fetches here.
-    if (actor && contractId && fetchedForActorRef.current !== actor) {
-      fetchedForActorRef.current = actor;
+    if (actor && contractId) {
       fetchContract();
     }
-  }, [actor, contractId, fetchContract]);
+  }, [actor]);
 
   const containerVariants = {
     hidden: {},
@@ -205,8 +199,12 @@ export default function ContractDetailPage() {
           </Button>
 
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-md bg-primary/20 flex items-center justify-center border border-primary/30 shrink-0">
-              <Train className="w-3.5 h-3.5 text-primary" />
+            <div className="w-8 h-8 rounded-md overflow-hidden flex items-center justify-center shrink-0">
+              <img
+                src="/assets/generated/railway-logo-transparent.dim_200x200.png"
+                alt="Railway Contracts Logo"
+                className="w-8 h-8 object-contain"
+              />
             </div>
             <div className="min-w-0">
               {isLoading ? (

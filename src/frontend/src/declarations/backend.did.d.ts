@@ -41,7 +41,6 @@ export interface SectionEntry {
   'notes' : string,
 }
 export type SectionType = { 'LOI' : null } |
-  { 'MaterialExpenses' : null } |
   { 'TenderDetails' : null } |
   { 'SiteExpenses' : null } |
   { 'RunningBill' : null };

@@ -51,7 +51,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { ContractResponse } from "../backend.d";
 import { useActor } from "../hooks/useActor";
@@ -137,8 +137,7 @@ export default function ContractsPage() {
     "All",
   );
 
-  // Guard against re-fetching on every actor invalidation cycle
-  const fetchedForActorRef = useRef<object | null>(null);
+  const [hasFetchedContracts, setHasFetchedContracts] = useState(false);
 
   const fetchContracts = useCallback(async () => {
     if (!actor) return;
@@ -155,14 +154,11 @@ export default function ContractsPage() {
   }, [actor]);
 
   useEffect(() => {
-    // Only fetch once per actor instance. The useActor hook internally
-    // invalidates all queries on mount, which would cause this to re-run
-    // on every render cycle — we prevent that with a ref guard.
-    if (actor && fetchedForActorRef.current !== actor) {
-      fetchedForActorRef.current = actor;
+    if (actor && !hasFetchedContracts) {
+      setHasFetchedContracts(true);
       fetchContracts();
     }
-  }, [actor, fetchContracts]);
+  }, [actor, hasFetchedContracts, fetchContracts]);
 
   // Derived stats
   const totalContracts = contracts.length;
@@ -203,8 +199,6 @@ export default function ContractsPage() {
       setContractValue("");
       setContractExpended("");
       setCreateOpen(false);
-      // Reset the ref so fetchContracts runs again to get the new contract
-      fetchedForActorRef.current = null;
       await fetchContracts();
     } catch (err) {
       toast.error("Failed to create contract");
@@ -245,7 +239,6 @@ export default function ContractsPage() {
       );
       toast.success("Contract updated");
       setEditDialog({ open: false, contract: null });
-      fetchedForActorRef.current = null;
       await fetchContracts();
     } catch (err) {
       toast.error("Failed to update contract");
@@ -289,8 +282,12 @@ export default function ContractsPage() {
       <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-md bg-primary/20 flex items-center justify-center border border-primary/30">
-              <Train className="w-4 h-4 text-primary" />
+            <div className="w-10 h-10 rounded-md overflow-hidden flex items-center justify-center">
+              <img
+                src="/assets/generated/railway-logo-transparent.dim_200x200.png"
+                alt="Railway Contracts Logo"
+                className="w-10 h-10 object-contain"
+              />
             </div>
             <div>
               <h1 className="font-display font-bold text-lg leading-none text-foreground">

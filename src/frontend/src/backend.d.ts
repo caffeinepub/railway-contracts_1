@@ -45,7 +45,6 @@ export interface FileRef {
 }
 export enum SectionType {
     LOI = "LOI",
-    MaterialExpenses = "MaterialExpenses",
     TenderDetails = "TenderDetails",
     SiteExpenses = "SiteExpenses",
     RunningBill = "RunningBill"

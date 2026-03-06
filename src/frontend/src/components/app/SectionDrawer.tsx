@@ -148,6 +148,36 @@ function ManualEntryTable({
     setRows((prev) => [...prev, createEmptyRow(headers.length)]);
   }
 
+  function insertRowAfter(rowIdx: number) {
+    setRows((prev) => {
+      const next = [...prev];
+      next.splice(rowIdx + 1, 0, createEmptyRow(headers.length));
+      return next;
+    });
+  }
+
+  function addColumn() {
+    const newColName = `Col ${headers.length + 1}`;
+    setHeaders((prev) => [...prev, newColName]);
+    setRows((prev) => prev.map((row) => [...row, ""]));
+  }
+
+  function insertColumnAfter(colIdx: number) {
+    const newColName = `Col ${headers.length + 1}`;
+    setHeaders((prev) => {
+      const next = [...prev];
+      next.splice(colIdx + 1, 0, newColName);
+      return next;
+    });
+    setRows((prev) =>
+      prev.map((row) => {
+        const next = [...row];
+        next.splice(colIdx + 1, 0, "");
+        return next;
+      }),
+    );
+  }
+
   function clearAll() {
     setHeaders([...DEFAULT_HEADERS]);
     setRows(
@@ -214,20 +244,36 @@ function ManualEntryTable({
         <table className="manual-entry-table">
           <thead>
             <tr>
+              {/* Empty corner cell for the row-# column */}
               <th className="text-muted-foreground w-10 text-center text-xs">
                 #
               </th>
               {headers.map((h, ci) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: header columns have no stable key
-                <th key={ci} className="min-w-[130px]">
+                <th // biome-ignore lint/suspicious/noArrayIndexKey: header columns have no stable key
+                  key={ci}
+                  className="min-w-[130px] group/col relative"
+                  style={{ position: "relative" }}
+                >
                   <input
                     type="text"
                     value={h}
                     onChange={(e) => updateHeader(ci, e.target.value)}
-                    className="w-full bg-transparent border-none outline-none text-xs font-semibold text-secondary-foreground placeholder:text-muted-foreground/60 focus:text-foreground transition-colors"
+                    className="w-full bg-transparent border-none outline-none text-xs font-semibold text-secondary-foreground placeholder:text-muted-foreground/60 focus:text-foreground transition-colors pr-6"
                     placeholder={`Col ${ci + 1}`}
                     aria-label={`Column ${ci + 1} header`}
                   />
+                  {/* Insert column after this column — visible on header hover */}
+                  <button
+                    type="button"
+                    onClick={() => insertColumnAfter(ci)}
+                    aria-label={`Insert column after column ${ci + 1}`}
+                    data-ocid="manual-entry.secondary_button"
+                    title="Insert column after"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 h-5 w-5 rounded flex items-center justify-center opacity-0 group-hover/col:opacity-100 transition-opacity bg-primary/10 hover:bg-primary/20 text-primary z-10"
+                    style={{ padding: 0 }}
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
                 </th>
               ))}
             </tr>
@@ -235,9 +281,23 @@ function ManualEntryTable({
           <tbody>
             {rows.map((row, ri) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: rows have no stable key
-              <tr key={ri}>
-                <td className="text-muted-foreground text-center text-xs w-10 select-none">
-                  {ri + 1}
+              <tr key={ri} className="group/row">
+                {/* Row number cell with insert-row-after affordance */}
+                <td className="text-muted-foreground text-center text-xs w-10 select-none relative">
+                  <span className="group-hover/row:opacity-0 transition-opacity">
+                    {ri + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => insertRowAfter(ri)}
+                    aria-label={`Insert row after row ${ri + 1}`}
+                    data-ocid="manual-entry.toggle"
+                    title="Insert row after"
+                    className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity text-primary hover:bg-primary/10 rounded"
+                    style={{ padding: 0 }}
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
                 </td>
                 {headers.map((_, ci) => (
                   // biome-ignore lint/suspicious/noArrayIndexKey: cells have no stable key
@@ -258,8 +318,8 @@ function ManualEntryTable({
         </table>
       </div>
 
-      {/* Add Row footer */}
-      <div className="border-t border-border px-3 py-2">
+      {/* Footer: Add Row + Add Column */}
+      <div className="border-t border-border px-3 py-2 flex items-center gap-1">
         <Button
           type="button"
           variant="ghost"
@@ -270,6 +330,17 @@ function ManualEntryTable({
         >
           <Plus className="w-3 h-3" />
           Add Row
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={addColumn}
+          className="h-7 px-2 text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 gap-1.5"
+          data-ocid="manual-entry.edit_button"
+        >
+          <Plus className="w-3 h-3" />
+          Add Column
         </Button>
       </div>
     </div>
@@ -299,6 +370,10 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
 
   // PDF preview
   const [pdfPreviewFileId, setPdfPreviewFileId] = useState<string | null>(null);
+  const [pdfObjectUrls, setPdfObjectUrls] = useState<Record<string, string>>(
+    {},
+  );
+  const pdfObjectUrlsRef = useRef<Record<string, string>>({});
 
   // Manual entry persistence
   const [manualEntryData, setManualEntryData] = useState<{
@@ -481,7 +556,16 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
       const url = fileRef.blob.getDirectURL();
       const a = document.createElement("a");
       a.href = url;
-      a.download = fileRef.filename;
+
+      // For Excel files, always force .xlsx extension
+      const ext = fileRef.fileType.toLowerCase();
+      if (ext === "xlsx" || ext === "xls") {
+        const baseName = fileRef.filename.replace(/\.[^/.]+$/, "");
+        a.download = `${baseName}.xlsx`;
+      } else {
+        a.download = fileRef.filename;
+      }
+
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -539,8 +623,39 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
     }
   }
 
-  function togglePdfPreview(fileId: string) {
-    setPdfPreviewFileId((prev) => (prev === fileId ? null : fileId));
+  // Cleanup object URLs when drawer closes or section changes
+  useEffect(() => {
+    return () => {
+      for (const url of Object.values(pdfObjectUrlsRef.current)) {
+        URL.revokeObjectURL(url);
+      }
+    };
+  }, []);
+
+  async function togglePdfPreview(fileRef: FileRef) {
+    const fileId = fileRef.fileId;
+    if (pdfPreviewFileId === fileId) {
+      setPdfPreviewFileId(null);
+      return;
+    }
+    // If we already have an object URL for this file, just show it
+    if (pdfObjectUrls[fileId]) {
+      setPdfPreviewFileId(fileId);
+      return;
+    }
+    // Fetch the PDF bytes and create a local object URL
+    try {
+      const rawUrl = fileRef.blob.getDirectURL();
+      const response = await fetch(rawUrl);
+      const arrayBuffer = await response.arrayBuffer();
+      const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+      const objectUrl = URL.createObjectURL(blob);
+      pdfObjectUrlsRef.current[fileId] = objectUrl;
+      setPdfObjectUrls((prev) => ({ ...prev, [fileId]: objectUrl }));
+      setPdfPreviewFileId(fileId);
+    } catch {
+      toast.error("Failed to load PDF preview");
+    }
   }
 
   const isOpen = !!section;
@@ -758,7 +873,7 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                                         size="icon"
                                         className={`h-8 w-8 transition-opacity ${isPdfPreviewOpen ? "opacity-100 text-primary" : "opacity-60 hover:opacity-100"} hover:bg-secondary`}
                                         onClick={() =>
-                                          togglePdfPreview(fileRef.fileId)
+                                          togglePdfPreview(fileRef)
                                         }
                                         aria-label={
                                           isPdfPreviewOpen
@@ -831,7 +946,7 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                                   {isPdf && isPdfPreviewOpen && (
                                     <motion.div
                                       initial={{ height: 0, opacity: 0 }}
-                                      animate={{ height: "500px", opacity: 1 }}
+                                      animate={{ height: "600px", opacity: 1 }}
                                       exit={{ height: 0, opacity: 0 }}
                                       transition={{
                                         duration: 0.3,
@@ -840,10 +955,18 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                                       className="overflow-hidden border-t border-border"
                                       data-ocid={`section.pdf.panel.${fileIdx + 1}`}
                                     >
-                                      <embed
-                                        src={fileRef.blob.getDirectURL()}
-                                        type="application/pdf"
-                                        className="w-full h-full bg-secondary/20"
+                                      <iframe
+                                        src={
+                                          pdfObjectUrls[fileRef.fileId]
+                                            ? `${pdfObjectUrls[fileRef.fileId]}#toolbar=1&navpanes=1&scrollbar=1`
+                                            : ""
+                                        }
+                                        className="w-full bg-secondary/20"
+                                        style={{
+                                          height: "600px",
+                                          border: "none",
+                                          display: "block",
+                                        }}
                                         title={fileRef.filename}
                                       />
                                     </motion.div>

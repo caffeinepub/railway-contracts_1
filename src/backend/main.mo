@@ -6,9 +6,9 @@ import Order "mo:core/Order";
 import Runtime "mo:core/Runtime";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
-import Migration "migration";
 
-(with migration = Migration.run)
+
+
 actor {
   include MixinStorage();
 
@@ -17,7 +17,6 @@ actor {
     #LOI;
     #RunningBill;
     #SiteExpenses;
-    #MaterialExpenses;
   };
 
   type FileRef = {
@@ -59,9 +58,9 @@ actor {
     rows : [[Text]];
   };
 
-  stable var nextContractId = 0;
-  stable var contracts : [Contract] = [];
-  stable var manualEntries : [ManualEntryRecord] = [];
+  var nextContractId = 0;
+  var contracts : [Contract] = [];
+  var manualEntries : [ManualEntryRecord] = [];
 
   func sectionKey(contractId : Nat, sectionType : SectionType) : Text {
     let sectionName = switch (sectionType) {
@@ -69,7 +68,6 @@ actor {
       case (#LOI) { "LOI" };
       case (#RunningBill) { "RunningBill" };
       case (#SiteExpenses) { "SiteExpenses" };
-      case (#MaterialExpenses) { "MaterialExpenses" };
     };
     contractId.toText() # ":" # sectionName;
   };
@@ -110,7 +108,6 @@ actor {
       createEmptySection(#LOI),
       createEmptySection(#RunningBill),
       createEmptySection(#SiteExpenses),
-      createEmptySection(#MaterialExpenses),
     ];
   };
 
@@ -418,7 +415,6 @@ actor {
               case (#LOI) { "LOI" };
               case (#RunningBill) { "Running Bill" };
               case (#SiteExpenses) { "Site Expenses" };
-              case (#MaterialExpenses) { "Material Expenses" };
             };
             (sectionLabel, section.files.size());
           }
@@ -479,3 +475,4 @@ actor {
     };
   };
 };
+

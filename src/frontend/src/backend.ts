@@ -131,7 +131,6 @@ export interface _CaffeineStorageRefillResult {
 }
 export enum SectionType {
     LOI = "LOI",
-    MaterialExpenses = "MaterialExpenses",
     TenderDetails = "TenderDetails",
     SiteExpenses = "SiteExpenses",
     RunningBill = "RunningBill"
@@ -604,15 +603,13 @@ function from_candid_record_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint
 function from_candid_variant_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     LOI: null;
 } | {
-    MaterialExpenses: null;
-} | {
     TenderDetails: null;
 } | {
     SiteExpenses: null;
 } | {
     RunningBill: null;
 }): SectionType {
-    return "LOI" in value ? SectionType.LOI : "MaterialExpenses" in value ? SectionType.MaterialExpenses : "TenderDetails" in value ? SectionType.TenderDetails : "SiteExpenses" in value ? SectionType.SiteExpenses : "RunningBill" in value ? SectionType.RunningBill : value;
+    return "LOI" in value ? SectionType.LOI : "TenderDetails" in value ? SectionType.TenderDetails : "SiteExpenses" in value ? SectionType.SiteExpenses : "RunningBill" in value ? SectionType.RunningBill : value;
 }
 function from_candid_vec_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_ContractResponse>): Array<ContractResponse> {
     return value.map((x)=>from_candid_ContractResponse_n13(_uploadFile, _downloadFile, x));
@@ -653,8 +650,6 @@ function to_candid_record_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
 function to_candid_variant_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: SectionType): {
     LOI: null;
 } | {
-    MaterialExpenses: null;
-} | {
     TenderDetails: null;
 } | {
     SiteExpenses: null;
@@ -663,8 +658,6 @@ function to_candid_variant_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8
 } {
     return value == SectionType.LOI ? {
         LOI: null
-    } : value == SectionType.MaterialExpenses ? {
-        MaterialExpenses: null
     } : value == SectionType.TenderDetails ? {
         TenderDetails: null
     } : value == SectionType.SiteExpenses ? {

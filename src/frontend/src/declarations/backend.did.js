@@ -21,7 +21,6 @@ export const _CaffeineStorageRefillResult = IDL.Record({
 });
 export const SectionType = IDL.Variant({
   'LOI' : IDL.Null,
-  'MaterialExpenses' : IDL.Null,
   'TenderDetails' : IDL.Null,
   'SiteExpenses' : IDL.Null,
   'RunningBill' : IDL.Null,
@@ -151,7 +150,6 @@ export const idlFactory = ({ IDL }) => {
   });
   const SectionType = IDL.Variant({
     'LOI' : IDL.Null,
-    'MaterialExpenses' : IDL.Null,
     'TenderDetails' : IDL.Null,
     'SiteExpenses' : IDL.Null,
     'RunningBill' : IDL.Null,
