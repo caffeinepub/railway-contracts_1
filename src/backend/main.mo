@@ -6,7 +6,9 @@ import Order "mo:core/Order";
 import Runtime "mo:core/Runtime";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
+import Migration "migration";
 
+(with migration = Migration.run)
 actor {
   include MixinStorage();
 
@@ -37,6 +39,7 @@ actor {
     name : Text;
     status : Text;
     contractValue : ?Nat;
+    alreadyExpended : ?Nat;
     createdAt : Int;
     sections : [SectionEntry];
   };
@@ -46,6 +49,7 @@ actor {
     name : Text;
     status : Text;
     contractValue : ?Nat;
+    alreadyExpended : ?Nat;
     createdAt : Int;
   };
 
@@ -116,7 +120,7 @@ actor {
     };
   };
 
-  func createContractInternal(name : Text, status : Text, contractValue : ?Nat) : Nat {
+  func createContractInternal(name : Text, status : Text, contractValue : ?Nat, alreadyExpended : ?Nat) : Nat {
     let contractId = nextContractId;
     nextContractId += 1;
 
@@ -125,6 +129,7 @@ actor {
       name;
       status;
       contractValue;
+      alreadyExpended;
       createdAt = Time.now();
       sections = createAllSections();
     };
@@ -133,8 +138,8 @@ actor {
     contractId;
   };
 
-  public shared ({ caller }) func createContract(name : Text, status : Text, contractValue : ?Nat) : async Nat {
-    createContractInternal(name, status, contractValue);
+  public shared ({ caller }) func createContract(name : Text, status : Text, contractValue : ?Nat, alreadyExpended : ?Nat) : async Nat {
+    createContractInternal(name, status, contractValue, alreadyExpended);
   };
 
   public shared ({ caller }) func seedWithContracts(seedCount : Nat) : async () {
@@ -142,7 +147,7 @@ actor {
     while (i < seedCount) {
       let statusText = if (i % 2 == 0) { "Active" } else { "Completed" };
       let value = if (i % 3 == 0) { ?(i * 1000) } else { null };
-      let _ = createContractInternal("Seed Contract " # i.toText(), statusText, value);
+      let _ = createContractInternal("Seed Contract " # i.toText(), statusText, value, null);
       i += 1;
     };
   };
@@ -155,6 +160,7 @@ actor {
           name = contract.name;
           status = contract.status;
           contractValue = contract.contractValue;
+          alreadyExpended = contract.alreadyExpended;
           createdAt = contract.createdAt;
         };
       },
@@ -172,6 +178,7 @@ actor {
           name = c.name;
           status = c.status;
           contractValue = c.contractValue;
+          alreadyExpended = c.alreadyExpended;
           createdAt = c.createdAt;
         };
       };
@@ -189,7 +196,7 @@ actor {
     };
   };
 
-  public shared ({ caller }) func updateContract(id : Nat, name : Text, status : Text, contractValue : ?Nat) : async () {
+  public shared ({ caller }) func updateContract(id : Nat, name : Text, status : Text, contractValue : ?Nat, alreadyExpended : ?Nat) : async () {
     switch (findContractIndex(id)) {
       case (null) { Runtime.trap("Contract not found") };
       case (?index) {
@@ -199,6 +206,7 @@ actor {
           name;
           status;
           contractValue;
+          alreadyExpended;
           createdAt = existingContract.createdAt;
           sections = existingContract.sections;
         };
@@ -259,6 +267,7 @@ actor {
               name = contract.name;
               status = contract.status;
               contractValue = contract.contractValue;
+              alreadyExpended = contract.alreadyExpended;
               createdAt = contract.createdAt;
               sections = updatedSections;
             };
@@ -333,6 +342,7 @@ actor {
               name = contract.name;
               status = contract.status;
               contractValue = contract.contractValue;
+              alreadyExpended = contract.alreadyExpended;
               createdAt = contract.createdAt;
               sections = updatedSections;
             };
@@ -380,6 +390,7 @@ actor {
               name = contract.name;
               status = contract.status;
               contractValue = contract.contractValue;
+              alreadyExpended = contract.alreadyExpended;
               createdAt = contract.createdAt;
               sections = updatedSections;
             };

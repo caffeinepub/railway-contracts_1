@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate, useParams } from "@tanstack/react-router";
@@ -9,20 +8,28 @@ import {
   FileText,
   HardHat,
   IndianRupee,
-  Package,
   Receipt,
   Train,
+  TrendingDown,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { SectionType } from "../backend";
 import type { ContractResponse } from "../backend.d";
 import SectionDrawer from "../components/app/SectionDrawer";
 import { useActor } from "../hooks/useActor";
 
-interface SectionMeta {
-  type: SectionType;
+// Use raw variant objects instead of SectionType enum to avoid runtime import issues.
+// Motoko variants are represented as { VariantName: null } in Candid JS bindings.
+export type SectionVariant =
+  | { TenderDetails: null }
+  | { LOI: null }
+  | { RunningBill: null }
+  | { SiteExpenses: null };
+
+export interface SectionMeta {
+  type: SectionVariant;
+  key: string;
   label: string;
   description: string;
   icon: React.ReactNode;
@@ -32,41 +39,12 @@ interface SectionMeta {
   isExpense: boolean;
 }
 
-const SKELETON_KEYS = ["sk1", "sk2", "sk3", "sk4", "sk5"];
+const SKELETON_KEYS = ["sk1", "sk2", "sk3", "sk4"];
 
 const SECTIONS: SectionMeta[] = [
   {
-    type: SectionType.TenderDetails,
-    label: "Tender Details",
-    description: "Official tender documents, NIT, and specifications",
-    icon: <FileText className="w-6 h-6" />,
-    accentClass: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-    borderHoverClass: "hover:border-blue-500/40",
-    indicatorClass: "bg-blue-400",
-    isExpense: false,
-  },
-  {
-    type: SectionType.LOI,
-    label: "LOI",
-    description: "Letter of Intent and acceptance documents",
-    icon: <FileSignature className="w-6 h-6" />,
-    accentClass: "text-violet-400 bg-violet-500/10 border-violet-500/20",
-    borderHoverClass: "hover:border-violet-500/40",
-    indicatorClass: "bg-violet-400",
-    isExpense: false,
-  },
-  {
-    type: SectionType.RunningBill,
-    label: "Running Bill",
-    description: "Running account bills and payment certificates",
-    icon: <Receipt className="w-6 h-6" />,
-    accentClass: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-    borderHoverClass: "hover:border-emerald-500/40",
-    indicatorClass: "bg-emerald-400",
-    isExpense: false,
-  },
-  {
-    type: SectionType.SiteExpenses,
+    type: { SiteExpenses: null },
+    key: "SiteExpenses",
     label: "Site Expenses",
     description: "Labour, equipment, and on-site expenditure records",
     icon: <HardHat className="w-6 h-6" />,
@@ -76,14 +54,37 @@ const SECTIONS: SectionMeta[] = [
     isExpense: true,
   },
   {
-    type: SectionType.MaterialExpenses,
-    label: "Material Expenses",
-    description: "Material procurement invoices and cost sheets",
-    icon: <Package className="w-6 h-6" />,
-    accentClass: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-    borderHoverClass: "hover:border-orange-500/40",
-    indicatorClass: "bg-orange-400",
-    isExpense: true,
+    type: { RunningBill: null },
+    key: "RunningBill",
+    label: "Billing Details",
+    description: "Running account bills and payment certificates",
+    icon: <Receipt className="w-6 h-6" />,
+    accentClass: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+    borderHoverClass: "hover:border-emerald-500/40",
+    indicatorClass: "bg-emerald-400",
+    isExpense: false,
+  },
+  {
+    type: { LOI: null },
+    key: "LOI",
+    label: "LOI",
+    description: "Letter of Intent and acceptance documents",
+    icon: <FileSignature className="w-6 h-6" />,
+    accentClass: "text-violet-400 bg-violet-500/10 border-violet-500/20",
+    borderHoverClass: "hover:border-violet-500/40",
+    indicatorClass: "bg-violet-400",
+    isExpense: false,
+  },
+  {
+    type: { TenderDetails: null },
+    key: "TenderDetails",
+    label: "Tender Details",
+    description: "Official tender documents, NIT, and specifications",
+    icon: <FileText className="w-6 h-6" />,
+    accentClass: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+    borderHoverClass: "hover:border-blue-500/40",
+    indicatorClass: "bg-blue-400",
+    isExpense: false,
   },
 ];
 
@@ -174,18 +175,15 @@ export default function ContractDetailPage() {
     },
   };
 
-  // Map SectionType enum values to the string keys returned by getContractFileCounts.
-  // The backend returns human-readable labels: "Tender Details", "LOI", etc.
-  function getSectionFileCount(sectionType: SectionType): number {
+  // Map section key strings to the human-readable labels returned by getContractFileCounts.
+  function getSectionFileCount(sectionKey: string): number {
     const labelMap: Record<string, string> = {
       TenderDetails: "Tender Details",
       LOI: "LOI",
       RunningBill: "Running Bill",
       SiteExpenses: "Site Expenses",
-      MaterialExpenses: "Material Expenses",
     };
-    const key = String(sectionType);
-    const label = labelMap[key] ?? key;
+    const label = labelMap[sectionKey] ?? sectionKey;
     return fileCounts.get(label) ?? 0;
   }
 
@@ -277,6 +275,24 @@ export default function ContractDetailPage() {
                       {formatIndianCurrency(contract.contractValue)}
                     </span>
                   )}
+                {(() => {
+                  const val = contract?.alreadyExpended
+                    ? Number(contract.alreadyExpended)
+                    : 0;
+                  if (val > 0) {
+                    return (
+                      <span
+                        className="inline-flex items-center gap-1 text-xs font-body font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full"
+                        data-ocid="contract.expended.card"
+                      >
+                        <TrendingDown className="w-3 h-3" />
+                        Expended: ₹
+                        {formatIndianCurrency(BigInt(Math.round(val)))}
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
                 <span className="text-muted-foreground font-body text-sm">
                   Manage documents and expenses for this contract
                 </span>
@@ -301,10 +317,10 @@ export default function ContractDetailPage() {
             data-ocid="contract.sections.list"
           >
             {SECTIONS.map((section, idx) => {
-              const fileCount = getSectionFileCount(section.type);
+              const fileCount = getSectionFileCount(section.key);
               return (
                 <motion.div
-                  key={section.type}
+                  key={section.key}
                   variants={itemVariants}
                   data-ocid={`contract.section.item.${idx + 1}`}
                 >

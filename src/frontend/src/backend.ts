@@ -94,6 +94,7 @@ export interface ContractResponse {
     status: string;
     name: string;
     createdAt: bigint;
+    alreadyExpended?: bigint;
     contractValue?: bigint;
 }
 export interface SectionEntry {
@@ -113,6 +114,7 @@ export interface Contract {
     status: string;
     name: string;
     createdAt: bigint;
+    alreadyExpended?: bigint;
     sections: Array<SectionEntry>;
     contractValue?: bigint;
 }
@@ -142,7 +144,7 @@ export interface backendInterface {
     _caffeineStorageRefillCashier(refillInformation: _CaffeineStorageRefillInformation | null): Promise<_CaffeineStorageRefillResult>;
     _caffeineStorageUpdateGatewayPrincipals(): Promise<void>;
     addFileToSection(contractId: bigint, section: SectionType, fileId: string, blob: ExternalBlob, filename: string, fileType: string): Promise<void>;
-    createContract(name: string, status: string, contractValue: bigint | null): Promise<bigint>;
+    createContract(name: string, status: string, contractValue: bigint | null, alreadyExpended: bigint | null): Promise<bigint>;
     deleteContract(id: bigint): Promise<void>;
     getAllContracts(): Promise<Array<ContractResponse>>;
     getContract(id: bigint): Promise<ContractResponse>;
@@ -159,7 +161,7 @@ export interface backendInterface {
     removeFileFromSection(contractId: bigint, section: SectionType, fileId: string): Promise<void>;
     saveManualEntry(contractId: bigint, section: SectionType, headers: Array<string>, rows: Array<Array<string>>): Promise<void>;
     seedWithContracts(seedCount: bigint): Promise<void>;
-    updateContract(id: bigint, name: string, status: string, contractValue: bigint | null): Promise<void>;
+    updateContract(id: bigint, name: string, status: string, contractValue: bigint | null, alreadyExpended: bigint | null): Promise<void>;
     updateSectionNotes(contractId: bigint, section: SectionType, notes: string): Promise<void>;
 }
 import type { Contract as _Contract, ContractResponse as _ContractResponse, ExternalBlob as _ExternalBlob, FileRef as _FileRef, SectionEntry as _SectionEntry, SectionType as _SectionType, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
@@ -263,17 +265,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async createContract(arg0: string, arg1: string, arg2: bigint | null): Promise<bigint> {
+    async createContract(arg0: string, arg1: string, arg2: bigint | null, arg3: bigint | null): Promise<bigint> {
         if (this.processError) {
             try {
-                const result = await this.actor.createContract(arg0, arg1, to_candid_opt_n11(this._uploadFile, this._downloadFile, arg2));
+                const result = await this.actor.createContract(arg0, arg1, to_candid_opt_n11(this._uploadFile, this._downloadFile, arg2), to_candid_opt_n11(this._uploadFile, this._downloadFile, arg3));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createContract(arg0, arg1, to_candid_opt_n11(this._uploadFile, this._downloadFile, arg2));
+            const result = await this.actor.createContract(arg0, arg1, to_candid_opt_n11(this._uploadFile, this._downloadFile, arg2), to_candid_opt_n11(this._uploadFile, this._downloadFile, arg3));
             return result;
         }
     }
@@ -423,17 +425,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async updateContract(arg0: bigint, arg1: string, arg2: string, arg3: bigint | null): Promise<void> {
+    async updateContract(arg0: bigint, arg1: string, arg2: string, arg3: bigint | null, arg4: bigint | null): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateContract(arg0, arg1, arg2, to_candid_opt_n11(this._uploadFile, this._downloadFile, arg3));
+                const result = await this.actor.updateContract(arg0, arg1, arg2, to_candid_opt_n11(this._uploadFile, this._downloadFile, arg3), to_candid_opt_n11(this._uploadFile, this._downloadFile, arg4));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateContract(arg0, arg1, arg2, to_candid_opt_n11(this._uploadFile, this._downloadFile, arg3));
+            const result = await this.actor.updateContract(arg0, arg1, arg2, to_candid_opt_n11(this._uploadFile, this._downloadFile, arg3), to_candid_opt_n11(this._uploadFile, this._downloadFile, arg4));
             return result;
         }
     }
@@ -493,12 +495,14 @@ function from_candid_record_n14(_uploadFile: (file: ExternalBlob) => Promise<Uin
     status: string;
     name: string;
     createdAt: bigint;
+    alreadyExpended: [] | [bigint];
     contractValue: [] | [bigint];
 }): {
     id: bigint;
     status: string;
     name: string;
     createdAt: bigint;
+    alreadyExpended?: bigint;
     contractValue?: bigint;
 } {
     return {
@@ -506,6 +510,7 @@ function from_candid_record_n14(_uploadFile: (file: ExternalBlob) => Promise<Uin
         status: value.status,
         name: value.name,
         createdAt: value.createdAt,
+        alreadyExpended: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.alreadyExpended)),
         contractValue: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.contractValue))
     };
 }
@@ -547,6 +552,7 @@ async function from_candid_record_n23(_uploadFile: (file: ExternalBlob) => Promi
     status: string;
     name: string;
     createdAt: bigint;
+    alreadyExpended: [] | [bigint];
     sections: Array<_SectionEntry>;
     contractValue: [] | [bigint];
 }): Promise<{
@@ -554,6 +560,7 @@ async function from_candid_record_n23(_uploadFile: (file: ExternalBlob) => Promi
     status: string;
     name: string;
     createdAt: bigint;
+    alreadyExpended?: bigint;
     sections: Array<SectionEntry>;
     contractValue?: bigint;
 }> {
@@ -562,6 +569,7 @@ async function from_candid_record_n23(_uploadFile: (file: ExternalBlob) => Promi
         status: value.status,
         name: value.name,
         createdAt: value.createdAt,
+        alreadyExpended: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.alreadyExpended)),
         sections: await from_candid_vec_n24(_uploadFile, _downloadFile, value.sections),
         contractValue: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.contractValue))
     };

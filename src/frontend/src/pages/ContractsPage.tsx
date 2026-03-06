@@ -47,6 +47,7 @@ import {
   Search,
   Train,
   Trash2,
+  TrendingDown,
   TrendingUp,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -107,6 +108,7 @@ export default function ContractsPage() {
   const [contractStatus, setContractStatus] =
     useState<ContractStatus>("Active");
   const [contractValue, setContractValue] = useState("");
+  const [contractExpended, setContractExpended] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
   // Edit dialog
@@ -117,6 +119,7 @@ export default function ContractsPage() {
   const [editName, setEditName] = useState("");
   const [editStatus, setEditStatus] = useState<ContractStatus>("Active");
   const [editValue, setEditValue] = useState("");
+  const [editExpended, setEditExpended] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   // Delete
@@ -185,11 +188,20 @@ export default function ContractsPage() {
       const valueNum = contractValue.trim()
         ? BigInt(Math.round(Number(contractValue)))
         : null;
-      await actor.createContract(contractName.trim(), contractStatus, valueNum);
+      const expendedNum = contractExpended.trim()
+        ? BigInt(Math.round(Number(contractExpended)))
+        : null;
+      await actor.createContract(
+        contractName.trim(),
+        contractStatus,
+        valueNum,
+        expendedNum,
+      );
       toast.success(`Contract "${contractName.trim()}" created`);
       setContractName("");
       setContractStatus("Active");
       setContractValue("");
+      setContractExpended("");
       setCreateOpen(false);
       // Reset the ref so fetchContracts runs again to get the new contract
       fetchedForActorRef.current = null;
@@ -209,6 +221,9 @@ export default function ContractsPage() {
     setEditValue(
       contract.contractValue ? String(Number(contract.contractValue)) : "",
     );
+    setEditExpended(
+      contract.alreadyExpended ? String(Number(contract.alreadyExpended)) : "",
+    );
   }
 
   async function handleEdit() {
@@ -218,11 +233,15 @@ export default function ContractsPage() {
       const valueNum = editValue.trim()
         ? BigInt(Math.round(Number(editValue)))
         : null;
+      const expendedNum = editExpended.trim()
+        ? BigInt(Math.round(Number(editExpended)))
+        : null;
       await actor.updateContract(
         editDialog.contract.id,
         editName.trim(),
         editStatus,
         valueNum,
+        expendedNum,
       );
       toast.success("Contract updated");
       setEditDialog({ open: false, contract: null });
@@ -529,6 +548,25 @@ export default function ContractsPage() {
                         </div>
                       )}
 
+                    {/* Already Expended */}
+                    {(() => {
+                      const val = contract.alreadyExpended
+                        ? Number(contract.alreadyExpended)
+                        : 0;
+                      if (val > 0) {
+                        return (
+                          <div className="flex items-center gap-1 mt-1 text-xs text-amber-400 font-body font-semibold">
+                            <TrendingDown className="w-3 h-3 shrink-0" />
+                            <span>
+                              Expended: ₹
+                              {formatIndianCurrency(BigInt(Math.round(val)))}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
                     {/* Subtle indicator bar */}
                     <div className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-primary/0 group-hover:bg-primary/50 transition-all duration-300" />
 
@@ -605,6 +643,7 @@ export default function ContractsPage() {
             setContractName("");
             setContractStatus("Active");
             setContractValue("");
+            setContractExpended("");
           }
         }}
       >
@@ -692,6 +731,32 @@ export default function ContractsPage() {
                 />
               </div>
             </div>
+
+            <div>
+              <Label
+                htmlFor="contract-expended"
+                className="text-sm font-body font-medium text-foreground mb-2 block"
+              >
+                Already Expended (₹){" "}
+                <span className="text-muted-foreground font-normal">
+                  — optional
+                </span>
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-body">
+                  ₹
+                </span>
+                <Input
+                  id="contract-expended"
+                  type="number"
+                  placeholder="e.g. 450000"
+                  value={contractExpended}
+                  onChange={(e) => setContractExpended(e.target.value)}
+                  className="pl-7 bg-secondary border-border text-foreground placeholder:text-muted-foreground font-body"
+                  data-ocid="contracts.expended_input"
+                />
+              </div>
+            </div>
           </div>
           <DialogFooter className="gap-2">
             <Button
@@ -702,6 +767,7 @@ export default function ContractsPage() {
                 setContractName("");
                 setContractStatus("Active");
                 setContractValue("");
+                setContractExpended("");
               }}
               className="font-body"
               data-ocid="contracts.cancel_button"
@@ -815,6 +881,32 @@ export default function ContractsPage() {
                   onChange={(e) => setEditValue(e.target.value)}
                   className="pl-7 bg-secondary border-border text-foreground placeholder:text-muted-foreground font-body"
                   data-ocid="contracts.edit.input"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label
+                htmlFor="edit-expended"
+                className="text-sm font-body font-medium text-foreground mb-2 block"
+              >
+                Already Expended (₹){" "}
+                <span className="text-muted-foreground font-normal">
+                  — optional
+                </span>
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-body">
+                  ₹
+                </span>
+                <Input
+                  id="edit-expended"
+                  type="number"
+                  placeholder="e.g. 450000"
+                  value={editExpended}
+                  onChange={(e) => setEditExpended(e.target.value)}
+                  className="pl-7 bg-secondary border-border text-foreground placeholder:text-muted-foreground font-body"
+                  data-ocid="contracts.edit.expended_input"
                 />
               </div>
             </div>

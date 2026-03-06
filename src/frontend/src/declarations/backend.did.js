@@ -32,6 +32,7 @@ export const ContractResponse = IDL.Record({
   'status' : IDL.Text,
   'name' : IDL.Text,
   'createdAt' : IDL.Int,
+  'alreadyExpended' : IDL.Opt(IDL.Nat),
   'contractValue' : IDL.Opt(IDL.Nat),
 });
 export const FileRef = IDL.Record({
@@ -51,6 +52,7 @@ export const Contract = IDL.Record({
   'status' : IDL.Text,
   'name' : IDL.Text,
   'createdAt' : IDL.Int,
+  'alreadyExpended' : IDL.Opt(IDL.Nat),
   'sections' : IDL.Vec(SectionEntry),
   'contractValue' : IDL.Opt(IDL.Nat),
 });
@@ -88,7 +90,7 @@ export const idlService = IDL.Service({
       [],
     ),
   'createContract' : IDL.Func(
-      [IDL.Text, IDL.Text, IDL.Opt(IDL.Nat)],
+      [IDL.Text, IDL.Text, IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
       [IDL.Nat],
       [],
     ),
@@ -126,7 +128,7 @@ export const idlService = IDL.Service({
     ),
   'seedWithContracts' : IDL.Func([IDL.Nat], [], []),
   'updateContract' : IDL.Func(
-      [IDL.Nat, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat)],
+      [IDL.Nat, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
       [],
       [],
     ),
@@ -160,6 +162,7 @@ export const idlFactory = ({ IDL }) => {
     'status' : IDL.Text,
     'name' : IDL.Text,
     'createdAt' : IDL.Int,
+    'alreadyExpended' : IDL.Opt(IDL.Nat),
     'contractValue' : IDL.Opt(IDL.Nat),
   });
   const FileRef = IDL.Record({
@@ -179,6 +182,7 @@ export const idlFactory = ({ IDL }) => {
     'status' : IDL.Text,
     'name' : IDL.Text,
     'createdAt' : IDL.Int,
+    'alreadyExpended' : IDL.Opt(IDL.Nat),
     'sections' : IDL.Vec(SectionEntry),
     'contractValue' : IDL.Opt(IDL.Nat),
   });
@@ -216,7 +220,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'createContract' : IDL.Func(
-        [IDL.Text, IDL.Text, IDL.Opt(IDL.Nat)],
+        [IDL.Text, IDL.Text, IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
         [IDL.Nat],
         [],
       ),
@@ -258,7 +262,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'seedWithContracts' : IDL.Func([IDL.Nat], [], []),
     'updateContract' : IDL.Func(
-        [IDL.Nat, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat)],
+        [IDL.Nat, IDL.Text, IDL.Text, IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
         [],
         [],
       ),

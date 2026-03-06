@@ -1,35 +1,30 @@
 # Railway Contracts
 
 ## Current State
-Full-stack app with a Motoko backend (blob-storage, contract CRUD, 5 sections per contract) and a React/TypeScript frontend. The backend is stable and working. The frontend has:
-- ContractsPage: list/create/delete contracts with FAB
-- ContractDetailPage: 5 section cards + Expense Summary (site, material, grand total from xlsx)
-- SectionDrawer: slide-in panel with file list, upload button, PDF preview (iframe), spreadsheet preview (xlsx only for expense sections), delete confirm
-
-Previous issues: contract creation failed, section cards were not appearing inside contracts.
+Full-stack contract management app with Motoko backend and React frontend. Contracts have name, status, contractValue, and an `alreadyExpended` value — but `alreadyExpended` is currently stored only in the browser's `localStorage`, meaning it is lost when the browser is cleared and does not sync across devices.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Ensure all 5 section folders are reliably visible on ContractDetailPage
-- Ensure contract creation works reliably (actor ready before call)
-- For non-expense sections (Tender Details, LOI, Running Bill): allow uploading xlsx, pdf, doc, docx with spreadsheet preview for xlsx files too
-- PDF inline preview (iframe) works for all sections
+- `alreadyExpended : ?Nat` field to the Motoko `Contract` and `ContractResponse` types
+- New parameter `alreadyExpended : ?Nat` to `createContract` and `updateContract` backend functions
 
 ### Modify
-- SectionDrawer: show spreadsheet preview for ALL sections (not just expense), when an xlsx file is present
-- Upload button stays as a small icon in the drawer header (keep current design)
-- Expense Summary: totals calculated only from uploaded xlsx files, no extra buttons
-- Contract detail page loads sections as static list (no backend call needed for section list)
-- Remove any "summary buttons" that appeared in prior versions
+- `createContract`: accept and persist `alreadyExpended`
+- `updateContract`: accept and persist `alreadyExpended`
+- `getAllContracts`, `getContract`: return `alreadyExpended` in the response
+- `ContractsPage.tsx`: replace all `localStorage.getItem/setItem('rc_expended_...')` reads/writes with the backend field
+- `ContractDetailPage.tsx`: replace localStorage read with `contract.alreadyExpended` from backend response
 
 ### Remove
-- Nothing to remove from the current clean state
+- All `localStorage` usage related to `rc_expended_*` keys
 
 ## Implementation Plan
-1. Fix ContractDetailPage to ensure all 5 sections render correctly as cards
-2. Fix SectionDrawer to allow xlsx/pdf/doc/docx for ALL sections (not just expense sections)
-3. Fix SectionDrawer spreadsheet preview to show for any section when an xlsx file is uploaded
-4. Ensure actor is fully ready before createContract is called (handle isFetching guard correctly)
-5. Keep PDF preview, upload icon button, and Expense Summary cards as-is
-6. Validate and build
+1. Update Motoko `Contract` and `ContractResponse` types to include `alreadyExpended : ?Nat`
+2. Update `createContract(name, status, contractValue, alreadyExpended)` signature
+3. Update `updateContract(id, name, status, contractValue, alreadyExpended)` signature
+4. Update `createContractInternal` helper
+5. Update `getAllContracts` and `getContract` query responses to include `alreadyExpended`
+6. Regenerate `backend.d.ts` to expose the updated interface
+7. Update `ContractsPage.tsx` to pass `alreadyExpended` to backend calls and read it from contract responses
+8. Update `ContractDetailPage.tsx` to read `contract.alreadyExpended` instead of localStorage

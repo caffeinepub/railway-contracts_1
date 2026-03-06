@@ -19,6 +19,7 @@ export interface ContractResponse {
     status: string;
     name: string;
     createdAt: bigint;
+    alreadyExpended?: bigint;
     contractValue?: bigint;
 }
 export interface SectionEntry {
@@ -31,6 +32,7 @@ export interface Contract {
     status: string;
     name: string;
     createdAt: bigint;
+    alreadyExpended?: bigint;
     sections: Array<SectionEntry>;
     contractValue?: bigint;
 }
@@ -50,7 +52,7 @@ export enum SectionType {
 }
 export interface backendInterface {
     addFileToSection(contractId: bigint, section: SectionType, fileId: string, blob: ExternalBlob, filename: string, fileType: string): Promise<void>;
-    createContract(name: string, status: string, contractValue: bigint | null): Promise<bigint>;
+    createContract(name: string, status: string, contractValue: bigint | null, alreadyExpended: bigint | null): Promise<bigint>;
     deleteContract(id: bigint): Promise<void>;
     getAllContracts(): Promise<Array<ContractResponse>>;
     getContract(id: bigint): Promise<ContractResponse>;
@@ -67,6 +69,6 @@ export interface backendInterface {
     removeFileFromSection(contractId: bigint, section: SectionType, fileId: string): Promise<void>;
     saveManualEntry(contractId: bigint, section: SectionType, headers: Array<string>, rows: Array<Array<string>>): Promise<void>;
     seedWithContracts(seedCount: bigint): Promise<void>;
-    updateContract(id: bigint, name: string, status: string, contractValue: bigint | null): Promise<void>;
+    updateContract(id: bigint, name: string, status: string, contractValue: bigint | null, alreadyExpended: bigint | null): Promise<void>;
     updateSectionNotes(contractId: bigint, section: SectionType, notes: string): Promise<void>;
 }

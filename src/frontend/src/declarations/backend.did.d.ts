@@ -15,6 +15,7 @@ export interface Contract {
   'status' : string,
   'name' : string,
   'createdAt' : bigint,
+  'alreadyExpended' : [] | [bigint],
   'sections' : Array<SectionEntry>,
   'contractValue' : [] | [bigint],
 }
@@ -23,6 +24,7 @@ export interface ContractResponse {
   'status' : string,
   'name' : string,
   'createdAt' : bigint,
+  'alreadyExpended' : [] | [bigint],
   'contractValue' : [] | [bigint],
 }
 export type ExternalBlob = Uint8Array;
@@ -74,7 +76,10 @@ export interface _SERVICE {
     [bigint, SectionType, string, ExternalBlob, string, string],
     undefined
   >,
-  'createContract' : ActorMethod<[string, string, [] | [bigint]], bigint>,
+  'createContract' : ActorMethod<
+    [string, string, [] | [bigint], [] | [bigint]],
+    bigint
+  >,
   'deleteContract' : ActorMethod<[bigint], undefined>,
   'getAllContracts' : ActorMethod<[], Array<ContractResponse>>,
   'getContract' : ActorMethod<[bigint], ContractResponse>,
@@ -98,7 +103,7 @@ export interface _SERVICE {
   >,
   'seedWithContracts' : ActorMethod<[bigint], undefined>,
   'updateContract' : ActorMethod<
-    [bigint, string, string, [] | [bigint]],
+    [bigint, string, string, [] | [bigint], [] | [bigint]],
     undefined
   >,
   'updateSectionNotes' : ActorMethod<[bigint, SectionType, string], undefined>,

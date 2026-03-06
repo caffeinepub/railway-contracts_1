@@ -1,15 +1,24 @@
-import Storage "blob-storage/Storage";
+import Array "mo:core/Array";
 
 module {
-  public type FileRef = {
-    fileId : Text;
-    blob : Storage.ExternalBlob;
-    filename : Text;
-    fileType : Text;
-    uploadedAt : Int;
+  // Old types (pre-migration)
+  type OldContract = {
+    id : Nat;
+    name : Text;
+    status : Text;
+    contractValue : ?Nat;
+    createdAt : Int;
+    sections : [SectionEntry];
   };
 
-  public type SectionType = {
+  // Other unchanged types from old actor
+  type SectionEntry = {
+    sectionType : SectionType;
+    files : [FileRef];
+    notes : Text;
+  };
+
+  type SectionType = {
     #TenderDetails;
     #LOI;
     #RunningBill;
@@ -17,24 +26,52 @@ module {
     #MaterialExpenses;
   };
 
-  public type SectionEntry = {
-    section : SectionType;
-    files : [FileRef];
+  type FileRef = {
+    fileId : Text;
+    blob : Blob;
+    filename : Text;
+    fileType : Text;
+    uploadedAt : Int;
   };
 
-  public type Contract = {
+  type ManualEntryRecord = {
+    key : Text;
+    headers : [Text];
+    rows : [[Text]];
+  };
+
+  // Old actor type
+  type OldActor = {
+    nextContractId : Nat;
+    contracts : [OldContract];
+    manualEntries : [ManualEntryRecord];
+  };
+
+  // New types (post-migration)
+  type NewContract = {
     id : Nat;
     name : Text;
+    status : Text;
+    contractValue : ?Nat;
+    alreadyExpended : ?Nat;
     createdAt : Int;
     sections : [SectionEntry];
   };
 
-  type Actor = {
+  // New actor type
+  type NewActor = {
     nextContractId : Nat;
-    contractsArray : [Contract];
+    contracts : [NewContract];
+    manualEntries : [ManualEntryRecord];
   };
 
-  public func run(old : Actor) : Actor {
-    old;
+  // Run migration: Transform old contracts to new contracts with alreadyExpended field
+  public func run(old : OldActor) : NewActor {
+    let newContracts = old.contracts.map<OldContract, NewContract>(
+      func(oldContract) {
+        { oldContract with alreadyExpended = null };
+      }
+    );
+    { old with contracts = newContracts };
   };
 };

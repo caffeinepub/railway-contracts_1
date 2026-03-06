@@ -34,29 +34,18 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ExternalBlob, type SectionType } from "../../backend";
+import { ExternalBlob } from "../../backend";
 import type { FileRef, backendInterface } from "../../backend";
 import { useActor } from "../../hooks/useActor";
+import type { SectionMeta } from "../../pages/ContractDetailPage";
 import {
   type SpreadsheetData,
-  parseXlsxBuffer,
   parseXlsxFile,
   parseXlsxFromUrl,
 } from "../../utils/xlsxParser";
 
 const FILE_SKELETON_KEYS = ["fsk1", "fsk2", "fsk3"];
 const PREVIEW_SKELETON_KEYS = ["psk1", "psk2", "psk3", "psk4", "psk5", "psk6"];
-
-interface SectionMeta {
-  type: SectionType;
-  label: string;
-  description: string;
-  icon: React.ReactNode;
-  accentClass: string;
-  borderHoverClass?: string;
-  indicatorClass?: string;
-  isExpense: boolean;
-}
 
 interface Props {
   contractId: bigint;
@@ -328,7 +317,11 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
     if (!actor || !section) return;
     try {
       setIsLoadingFiles(true);
-      const result = await actor.getSectionFiles(contractId, section.type);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await actor.getSectionFiles(
+        contractId,
+        section.type as any,
+      );
       const { files: fetchedFiles, notes: fetchedNotes } = result;
       setFiles(
         fetchedFiles.sort((a, b) => Number(b.uploadedAt - a.uploadedAt)),
@@ -352,7 +345,8 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
       if (section.isExpense) {
         setIsLoadingManualEntry(true);
         actor
-          .getManualEntry(contractId, section.type)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .getManualEntry(contractId, section.type as any)
           .then((data) => setManualEntryData(data ?? null))
           .catch(() => {})
           .finally(() => setIsLoadingManualEntry(false));
@@ -438,7 +432,8 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
 
       await actor.addFileToSection(
         contractId,
-        section.type,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        section.type as any,
         fileId,
         blob,
         file.name,
@@ -463,7 +458,8 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
     try {
       await actor.removeFileFromSection(
         contractId,
-        section.type,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        section.type as any,
         deleteTarget.fileId,
       );
       toast.success(`"${deleteTarget.filename}" removed`);
@@ -502,7 +498,8 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
     if (!actor || !section) return;
     setIsSavingNotes(true);
     try {
-      await actor.updateSectionNotes(contractId, section.type, notes);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await actor.updateSectionNotes(contractId, section.type as any, notes);
       toast.success("Notes saved");
     } catch (err) {
       toast.error("Failed to save notes");
@@ -526,7 +523,13 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
     if (!actor || !section) return;
     setIsSavingManualEntry(true);
     try {
-      await actor.saveManualEntry(contractId, section.type, headers, rows);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await actor.saveManualEntry(
+        contractId,
+        section.type as any,
+        headers,
+        rows,
+      );
       toast.success("Manual entry saved");
     } catch (err) {
       toast.error("Failed to save manual entry");
@@ -973,7 +976,7 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                       </div>
                     ) : (
                       <ManualEntryTable
-                        key={section.type}
+                        key={section.key}
                         initialHeaders={manualEntryData?.headers}
                         initialRows={manualEntryData?.rows}
                         isSaving={isSavingManualEntry}
