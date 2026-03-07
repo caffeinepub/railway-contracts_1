@@ -7,8 +7,6 @@ import Runtime "mo:core/Runtime";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
 
-
-
 actor {
   include MixinStorage();
 
@@ -111,10 +109,8 @@ actor {
     ];
   };
 
-  module ContractResponse {
-    public func compare(a : ContractResponse, b : ContractResponse) : Order.Order {
-      Int.compare(b.createdAt, a.createdAt);
-    };
+  func compareContractResponses(a : ContractResponse, b : ContractResponse) : Order.Order {
+    Int.compare(b.createdAt, a.createdAt);
   };
 
   func createContractInternal(name : Text, status : Text, contractValue : ?Nat, alreadyExpended : ?Nat) : Nat {
@@ -162,7 +158,7 @@ actor {
         };
       },
     );
-    contractResponses.sort();
+    contractResponses.sort(compareContractResponses);
   };
 
   public query ({ caller }) func getContract(id : Nat) : async ContractResponse {
@@ -475,4 +471,3 @@ actor {
     };
   };
 };
-

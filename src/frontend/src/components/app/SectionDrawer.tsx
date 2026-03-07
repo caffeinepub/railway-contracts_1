@@ -1042,6 +1042,38 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                   )}
                 </div>
 
+                {/* ── Manual Entry Table (expense sections only) ──────── */}
+                {section.isExpense && (
+                  <div>
+                    <h3 className="font-display font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                      <PencilLine className="w-4 h-4" />
+                      Quick Entry Table
+                    </h3>
+                    {isLoadingManualEntry ? (
+                      <div
+                        className="space-y-2"
+                        data-ocid="manual-entry.loading_state"
+                      >
+                        <Skeleton className="h-10 w-full rounded bg-card" />
+                        {[1, 2, 3, 4, 5].map((i) => (
+                          <Skeleton
+                            key={i}
+                            className="h-7 w-full rounded bg-card"
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <ManualEntryTable
+                        key={section.key}
+                        initialHeaders={manualEntryData?.headers}
+                        initialRows={manualEntryData?.rows}
+                        isSaving={isSavingManualEntry}
+                        onSave={handleSaveManualEntry}
+                      />
+                    )}
+                  </div>
+                )}
+
                 {/* ── Spreadsheet Preview (all sections with xlsx) ───── */}
                 <div>
                   <h3 className="font-display font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
@@ -1137,38 +1169,6 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                     </div>
                   )}
                 </div>
-
-                {/* ── Manual Entry Table (expense sections only) ──────── */}
-                {section.isExpense && (
-                  <div>
-                    <h3 className="font-display font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-                      <PencilLine className="w-4 h-4" />
-                      Quick Entry Table
-                    </h3>
-                    {isLoadingManualEntry ? (
-                      <div
-                        className="space-y-2"
-                        data-ocid="manual-entry.loading_state"
-                      >
-                        <Skeleton className="h-10 w-full rounded bg-card" />
-                        {[1, 2, 3, 4, 5].map((i) => (
-                          <Skeleton
-                            key={i}
-                            className="h-7 w-full rounded bg-card"
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <ManualEntryTable
-                        key={section.key}
-                        initialHeaders={manualEntryData?.headers}
-                        initialRows={manualEntryData?.rows}
-                        isSaving={isSavingManualEntry}
-                        onSave={handleSaveManualEntry}
-                      />
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           </motion.div>
