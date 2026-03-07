@@ -36,6 +36,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ExternalBlob } from "../../backend";
 import type { FileRef, backendInterface } from "../../backend";
+import { useIsMobile } from "../../hooks/use-mobile";
 import { useActor } from "../../hooks/useActor";
 import type { SectionMeta } from "../../pages/ContractDetailPage";
 import {
@@ -352,6 +353,7 @@ function ManualEntryTable({
 export default function SectionDrawer({ contractId, section, onClose }: Props) {
   const { actor: rawActor } = useActor();
   const actor = rawActor as backendInterface | null;
+  const isMobile = useIsMobile();
 
   const [files, setFiles] = useState<FileRef[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
@@ -946,7 +948,10 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                                   {isPdf && isPdfPreviewOpen && (
                                     <motion.div
                                       initial={{ height: 0, opacity: 0 }}
-                                      animate={{ height: "600px", opacity: 1 }}
+                                      animate={{
+                                        height: isMobile ? "auto" : "620px",
+                                        opacity: 1,
+                                      }}
                                       exit={{ height: 0, opacity: 0 }}
                                       transition={{
                                         duration: 0.3,
@@ -955,20 +960,76 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
                                       className="overflow-hidden border-t border-border"
                                       data-ocid={`section.pdf.panel.${fileIdx + 1}`}
                                     >
-                                      <iframe
-                                        src={
-                                          pdfObjectUrls[fileRef.fileId]
-                                            ? `${pdfObjectUrls[fileRef.fileId]}#toolbar=1&navpanes=1&scrollbar=1`
-                                            : ""
-                                        }
-                                        className="w-full bg-secondary/20"
-                                        style={{
-                                          height: "600px",
-                                          border: "none",
-                                          display: "block",
-                                        }}
-                                        title={fileRef.filename}
-                                      />
+                                      {/* Open in new tab button — always visible */}
+                                      <div className="flex items-center justify-between px-4 py-2 bg-secondary/40 border-b border-border">
+                                        <span className="text-xs text-muted-foreground font-body">
+                                          {isMobile
+                                            ? "PDF preview — tap to open full screen"
+                                            : "PDF preview — scroll to read"}
+                                        </span>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-7 px-2 text-xs gap-1.5 text-primary hover:bg-primary/10"
+                                          onClick={() => {
+                                            const url =
+                                              pdfObjectUrls[fileRef.fileId];
+                                            if (url) window.open(url, "_blank");
+                                          }}
+                                          aria-label="Open PDF in new tab"
+                                          data-ocid={`section.pdf.button.${fileIdx + 1}`}
+                                        >
+                                          <ExternalLink className="w-3.5 h-3.5" />
+                                          Open full screen
+                                        </Button>
+                                      </div>
+
+                                      {isMobile ? (
+                                        /* Mobile: tap-to-open card — iframes don't work on iOS/Android */
+                                        <div className="px-4 py-6 flex flex-col items-center gap-4 bg-secondary/20">
+                                          <div className="w-16 h-16 rounded-2xl bg-red-500/15 border border-red-500/25 flex items-center justify-center">
+                                            <FileType className="w-8 h-8 text-red-400" />
+                                          </div>
+                                          <div className="text-center">
+                                            <p className="text-sm font-body font-semibold text-foreground">
+                                              {fileRef.filename}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground font-body mt-1">
+                                              PDF documents open in your
+                                              browser's built-in viewer
+                                            </p>
+                                          </div>
+                                          <Button
+                                            type="button"
+                                            className="gap-2 bg-red-500 hover:bg-red-600 text-white font-body"
+                                            onClick={() => {
+                                              const url =
+                                                pdfObjectUrls[fileRef.fileId];
+                                              if (url)
+                                                window.open(url, "_blank");
+                                            }}
+                                            data-ocid={`section.pdf.primary_button.${fileIdx + 1}`}
+                                          >
+                                            <Eye className="w-4 h-4" />
+                                            Tap to View PDF
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        /* Desktop: full iframe embed */
+                                        <iframe
+                                          src={
+                                            pdfObjectUrls[fileRef.fileId] ?? ""
+                                          }
+                                          className="w-full bg-secondary/20"
+                                          style={{
+                                            height: "580px",
+                                            border: "none",
+                                            display: "block",
+                                          }}
+                                          title={fileRef.filename}
+                                        />
+                                      )}
                                     </motion.div>
                                   )}
                                 </AnimatePresence>
