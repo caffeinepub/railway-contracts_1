@@ -62,7 +62,7 @@ const SECTIONS: SectionMeta[] = [
     accentClass: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
     borderHoverClass: "hover:border-emerald-500/40",
     indicatorClass: "bg-emerald-400",
-    isExpense: false,
+    isExpense: true,
   },
   {
     type: { LOI: null },

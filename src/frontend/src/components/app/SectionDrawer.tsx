@@ -22,6 +22,7 @@ import {
   FileText,
   FileType,
   Loader2,
+  Minus,
   PencilLine,
   Plus,
   RotateCcw,
@@ -128,6 +129,7 @@ function ManualEntryTable({
         createEmptyRow(DEFAULT_HEADERS.length),
       ),
   );
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   function updateHeader(colIdx: number, value: string) {
     setHeaders((prev) => {
@@ -157,6 +159,10 @@ function ManualEntryTable({
     });
   }
 
+  function deleteRow(rowIdx: number) {
+    setRows((prev) => prev.filter((_, i) => i !== rowIdx));
+  }
+
   function addColumn() {
     const newColName = `Col ${headers.length + 1}`;
     setHeaders((prev) => [...prev, newColName]);
@@ -179,172 +185,242 @@ function ManualEntryTable({
     );
   }
 
-  function clearAll() {
+  function deleteColumn(colIdx: number) {
+    setHeaders((prev) => prev.filter((_, i) => i !== colIdx));
+    setRows((prev) => prev.map((row) => row.filter((_, i) => i !== colIdx)));
+  }
+
+  function confirmClearAll() {
     setHeaders([...DEFAULT_HEADERS]);
     setRows(
       Array.from({ length: DEFAULT_ROW_COUNT }, () =>
         createEmptyRow(DEFAULT_HEADERS.length),
       ),
     );
+    setShowClearConfirm(false);
   }
 
   return (
-    <div className="rounded-xl border border-border overflow-hidden bg-card">
-      {/* Section header bar */}
-      <div className="bg-secondary/50 px-4 py-2.5 border-b border-border flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <PencilLine className="w-4 h-4 text-primary shrink-0" />
-          <span className="text-xs font-body font-semibold text-foreground">
-            Manual Entry
-          </span>
-          <span className="text-xs text-muted-foreground font-body">
-            — editable scratch pad
-          </span>
+    <>
+      <div className="rounded-xl border border-border overflow-hidden bg-card">
+        {/* Section header bar */}
+        <div className="bg-secondary/50 px-4 py-2.5 border-b border-border flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <PencilLine className="w-4 h-4 text-primary shrink-0" />
+            <span className="text-xs font-body font-semibold text-foreground">
+              Manual Entry
+            </span>
+            <span className="text-xs text-muted-foreground font-body">
+              — editable scratch pad
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => onSave(headers, rows)}
+              disabled={isSaving}
+              className="h-7 px-2 text-xs gap-1.5 text-primary hover:bg-primary/10"
+              data-ocid="manual-entry.save_button"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <Save className="w-3 h-3" />
+                  Save
+                </>
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowClearConfirm(true)}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 gap-1.5"
+              data-ocid="manual-entry.delete_button"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Clear All
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => onSave(headers, rows)}
-            disabled={isSaving}
-            className="h-7 px-2 text-xs gap-1.5 text-primary hover:bg-primary/10"
-            data-ocid="manual-entry.save_button"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="w-3 h-3 animate-spin" />
-                Saving…
-              </>
-            ) : (
-              <>
-                <Save className="w-3 h-3" />
-                Save
-              </>
-            )}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={clearAll}
-            className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 gap-1.5"
-            data-ocid="manual-entry.delete_button"
-          >
-            <RotateCcw className="w-3 h-3" />
-            Clear All
-          </Button>
-        </div>
-      </div>
 
-      {/* Table */}
-      <div
-        className="spreadsheet-preview"
-        style={{ overflowX: "auto", overflowY: "auto", maxHeight: "400px" }}
-      >
-        <table className="manual-entry-table">
-          <thead>
-            <tr>
-              {/* Empty corner cell for the row-# column */}
-              <th className="text-muted-foreground w-10 text-center text-xs">
-                #
-              </th>
-              {headers.map((h, ci) => (
-                <th // biome-ignore lint/suspicious/noArrayIndexKey: header columns have no stable key
-                  key={ci}
-                  className="min-w-[130px] group/col relative"
-                  style={{ position: "relative" }}
-                >
-                  <input
-                    type="text"
-                    value={h}
-                    onChange={(e) => updateHeader(ci, e.target.value)}
-                    className="w-full bg-transparent border-none outline-none text-xs font-semibold text-secondary-foreground placeholder:text-muted-foreground/60 focus:text-foreground transition-colors pr-6"
-                    placeholder={`Col ${ci + 1}`}
-                    aria-label={`Column ${ci + 1} header`}
-                  />
-                  {/* Insert column after this column — visible on header hover */}
-                  <button
-                    type="button"
-                    onClick={() => insertColumnAfter(ci)}
-                    aria-label={`Insert column after column ${ci + 1}`}
-                    data-ocid="manual-entry.secondary_button"
-                    title="Insert column after"
-                    className="absolute right-0 top-1/2 -translate-y-1/2 h-5 w-5 rounded flex items-center justify-center opacity-0 group-hover/col:opacity-100 transition-opacity bg-primary/10 hover:bg-primary/20 text-primary z-10"
-                    style={{ padding: 0 }}
-                  >
-                    <Plus className="w-3 h-3" />
-                  </button>
+        {/* Table */}
+        <div
+          className="spreadsheet-preview"
+          style={{ overflowX: "auto", overflowY: "auto", maxHeight: "400px" }}
+        >
+          <table className="manual-entry-table">
+            <thead>
+              <tr>
+                {/* Empty corner cell for the row-# column */}
+                <th className="text-muted-foreground w-10 text-center text-xs">
+                  #
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, ri) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: rows have no stable key
-              <tr key={ri} className="group/row">
-                {/* Row number cell with insert-row-after affordance */}
-                <td className="text-muted-foreground text-center text-xs w-10 select-none relative">
-                  <span className="group-hover/row:opacity-0 transition-opacity">
-                    {ri + 1}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => insertRowAfter(ri)}
-                    aria-label={`Insert row after row ${ri + 1}`}
-                    data-ocid="manual-entry.toggle"
-                    title="Insert row after"
-                    className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity text-primary hover:bg-primary/10 rounded"
-                    style={{ padding: 0 }}
+                {headers.map((h, ci) => (
+                  <th // biome-ignore lint/suspicious/noArrayIndexKey: header columns have no stable key
+                    key={ci}
+                    className="min-w-[130px] group/col relative"
+                    style={{ position: "relative" }}
                   >
-                    <Plus className="w-3 h-3" />
-                  </button>
-                </td>
-                {headers.map((_, ci) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: cells have no stable key
-                  <td key={ci} className="p-0">
-                    <input
-                      type="text"
-                      value={row[ci] ?? ""}
-                      onChange={(e) => updateCell(ri, ci, e.target.value)}
-                      className="w-full h-full bg-transparent border-none outline-none text-xs text-foreground placeholder:text-muted-foreground/30 px-[10px] py-[5px] focus:bg-primary/5 transition-colors"
-                      placeholder="—"
-                      aria-label={`Row ${ri + 1}, ${headers[ci] || `Col ${ci + 1}`}`}
-                    />
-                  </td>
+                    <div className="flex items-center gap-1 pr-10">
+                      <input
+                        type="text"
+                        value={h}
+                        onChange={(e) => updateHeader(ci, e.target.value)}
+                        className="flex-1 bg-transparent border-none outline-none text-xs font-semibold text-secondary-foreground placeholder:text-muted-foreground/60 focus:text-foreground transition-colors"
+                        placeholder={`Col ${ci + 1}`}
+                        aria-label={`Column ${ci + 1} header`}
+                      />
+                    </div>
+                    {/* Insert column after — visible on header hover */}
+                    <button
+                      type="button"
+                      onClick={() => insertColumnAfter(ci)}
+                      aria-label={`Insert column after column ${ci + 1}`}
+                      data-ocid="manual-entry.secondary_button"
+                      title="Insert column after"
+                      className="absolute right-5 top-1/2 -translate-y-1/2 h-5 w-5 rounded flex items-center justify-center opacity-0 group-hover/col:opacity-100 transition-opacity bg-primary/10 hover:bg-primary/20 text-primary z-10"
+                      style={{ padding: 0 }}
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                    {/* Delete column — visible on header hover */}
+                    {headers.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => deleteColumn(ci)}
+                        aria-label={`Delete column ${ci + 1}`}
+                        title="Delete column"
+                        className="absolute right-0 top-1/2 -translate-y-1/2 h-5 w-5 rounded flex items-center justify-center opacity-0 group-hover/col:opacity-100 transition-opacity bg-destructive/10 hover:bg-destructive/20 text-destructive z-10"
+                        style={{ padding: 0 }}
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                    )}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((row, ri) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: rows have no stable key
+                <tr key={ri} className="group/row">
+                  {/* Row number cell with insert-row-after + delete affordances */}
+                  <td className="text-muted-foreground text-center text-xs w-10 select-none relative">
+                    <span className="group-hover/row:opacity-0 transition-opacity">
+                      {ri + 1}
+                    </span>
+                    {/* Insert row after */}
+                    <button
+                      type="button"
+                      onClick={() => insertRowAfter(ri)}
+                      aria-label={`Insert row after row ${ri + 1}`}
+                      data-ocid="manual-entry.toggle"
+                      title="Insert row after"
+                      className="absolute inset-y-0 left-0 w-1/2 flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity text-primary hover:bg-primary/10 rounded-l"
+                      style={{ padding: 0 }}
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                    {/* Delete row */}
+                    {rows.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => deleteRow(ri)}
+                        aria-label={`Delete row ${ri + 1}`}
+                        title="Delete row"
+                        className="absolute inset-y-0 right-0 w-1/2 flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity text-destructive hover:bg-destructive/10 rounded-r"
+                        style={{ padding: 0 }}
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                    )}
+                  </td>
+                  {headers.map((_, ci) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: cells have no stable key
+                    <td key={ci} className="p-0">
+                      <input
+                        type="text"
+                        value={row[ci] ?? ""}
+                        onChange={(e) => updateCell(ri, ci, e.target.value)}
+                        className="w-full h-full bg-transparent border-none outline-none text-xs text-foreground placeholder:text-muted-foreground/30 px-[10px] py-[5px] focus:bg-primary/5 transition-colors"
+                        placeholder="—"
+                        aria-label={`Row ${ri + 1}, ${headers[ci] || `Col ${ci + 1}`}`}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer: Add Row + Add Column */}
+        <div className="border-t border-border px-3 py-2 flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={addRow}
+            className="h-7 px-2 text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 gap-1.5"
+            data-ocid="manual-entry.primary_button"
+          >
+            <Plus className="w-3 h-3" />
+            Add Row
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={addColumn}
+            className="h-7 px-2 text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 gap-1.5"
+            data-ocid="manual-entry.edit_button"
+          >
+            <Plus className="w-3 h-3" />
+            Add Column
+          </Button>
+        </div>
       </div>
 
-      {/* Footer: Add Row + Add Column */}
-      <div className="border-t border-border px-3 py-2 flex items-center gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={addRow}
-          className="h-7 px-2 text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 gap-1.5"
-          data-ocid="manual-entry.primary_button"
+      {/* Clear All Confirmation */}
+      <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <AlertDialogContent
+          className="bg-popover border-border z-[70]"
+          data-ocid="manual-entry.clear.dialog"
         >
-          <Plus className="w-3 h-3" />
-          Add Row
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={addColumn}
-          className="h-7 px-2 text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 gap-1.5"
-          data-ocid="manual-entry.edit_button"
-        >
-          <Plus className="w-3 h-3" />
-          Add Column
-        </Button>
-      </div>
-    </div>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display font-bold text-foreground">
+              Clear All Data?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="font-body text-muted-foreground">
+              This will reset all rows, columns, and cell content back to the
+              default empty table. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="font-body"
+              data-ocid="manual-entry.clear.cancel_button"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmClearAll}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 font-body"
+              data-ocid="manual-entry.clear.confirm_button"
+            >
+              Yes, Clear All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
