@@ -94,6 +94,8 @@ function getFileTypeBadgeClass(fileType: string): string {
 // ─── Manual Entry Table ───────────────────────────────────────────────────────
 
 const DEFAULT_HEADERS = [
+  "Date",
+  "Party Name",
   "Description",
   "Quantity",
   "Unit Price",
@@ -462,6 +464,7 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
   const [isSavingManualEntry, setIsSavingManualEntry] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const savedScrollYRef = useRef<number>(0);
 
   // All sections now accept all file types for upload
   const acceptedTypes = ".xlsx,.pdf,.doc,.docx";
@@ -487,6 +490,32 @@ export default function SectionDrawer({ contractId, section, onClose }: Props) {
       setIsLoadingFiles(false);
     }
   }, [actor, contractId, section]);
+
+  // Preserve scroll position when drawer opens/closes on mobile
+  useEffect(() => {
+    if (section) {
+      // Save current scroll position before drawer opens
+      savedScrollYRef.current = window.scrollY;
+      // Prevent body scroll while drawer is open
+      document.body.style.overflow = "hidden";
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${savedScrollYRef.current}px`;
+      document.body.style.width = "100%";
+    } else {
+      // Restore scroll position when drawer closes
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      window.scrollTo(0, savedScrollYRef.current);
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+    };
+  }, [section]);
 
   useEffect(() => {
     if (section && actor) {

@@ -56,9 +56,9 @@ actor {
     rows : [[Text]];
   };
 
-  var nextContractId = 0;
-  var contracts : [Contract] = [];
-  var manualEntries : [ManualEntryRecord] = [];
+  stable var nextContractId = 0;
+  stable var contracts : [Contract] = [];
+  stable var manualEntries : [ManualEntryRecord] = [];
 
   func sectionKey(contractId : Nat, sectionType : SectionType) : Text {
     let sectionName = switch (sectionType) {
